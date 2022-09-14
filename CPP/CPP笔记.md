@@ -196,6 +196,10 @@ else
 stof("0.2121")
 // 将字符串转为double类型
 stod("0.2121")
+// 将字符串转换为长整型整数long int
+atoll("21")
+// 将字符串转换为长整数long long int
+atol("21")
 ```
 
 
@@ -1718,6 +1722,15 @@ project(HelloSLAM)
 # 设置编译模式
 set(CMAKE_BUILD_TYPE "Debug")
 
+# 寻找所需要的库
+# [COMPONENTS] [components…]：表示查找的包中必须要找到的组件(components），REQUIRED表示必须要找到的包
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  message_generation
+)
+
 # 添加一个可执行程序
 # 语法：add_executable( 程序名 源代码文件 ）
 add_executable(helloSLAM helloSLAM.cpp)
@@ -1731,6 +1744,9 @@ add_library(hello_shared SHARED libHelloSLAM.cpp)
 add_executable(useHello useHello.cpp)
 # 将库文件链接到可执行程序上(需要有头文件)
 target_link_libraries(useHello hello_shared)
-
+# 或者将库文件链接到整个项目上
+target_link_libraries($(CMAKE_PROJECT_NAME) hello_shared)
+# 表示编译顺序（即listener的编译需要beginner_tutorials_generate_messages_cpp的依赖，因此先生成依赖项）
+add_dependencies(listener beginner_tutorials_generate_messages_cpp)
 ```
 
