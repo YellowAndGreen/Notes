@@ -20,7 +20,7 @@ a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。
 int main(int argc,char** argv)
 {
 ....
-return 0;
+return 0; // 可以不写这句话，在main中若不写return则默认有return 0;
 }
 ```
 
@@ -1032,11 +1032,13 @@ int main()
 
 # 代码组织
 
+### **头文件和源文件：**
+
 By convention, there are two kinds of files into which we can store our C++ source: ==**header files (headers) and source files**.==
 
 > Header files usually have the .h (or .hpp) extension. Source files are files where we can store our definitions and the main program. They usually have the .cpp (or .cc) extension.
 
-
+## 不同的头文件命名规则
 
 To include user-defined header files, we use the #include statement, followed by a full header name with extension enclosed in double-quotes. Example:
 
@@ -1052,7 +1054,7 @@ To include user-defined header files, we use the #include statement, followed by
 
 
 
-编译多源文件：`g++ source.cpp mylibrary.cpp`
+
 
 ## 命名空间
 
