@@ -115,7 +115,16 @@ catkin_make
 </package>
 ```
 
+## 安装package所需依赖项
+
+ROS packages有时会需要操作系统提供一些外部函数库，这些函数库就是所谓的“系统依赖项”。在一些情况下，这些依赖项并没有被系统默认安装，因此，ROS提供了一个工具`rosdep`来下载并安装所需系统依赖项。
+
+```
+rosdep install turtlesim
+```
+
 # 节点，话题，服务与动作
+
 计算图（Computation Graph）是一个由ROS进程组成的点对点网络，它们能够共同处理数据。ROS的基本计算图概念有节点（Nodes）、主节点（Master）、参数服务器（Parameter Server）、消息（Messages）、服务（Services）、话题（Topics）和袋（Bags），它们都以不同的方式向图（Graph）提供数据。
 
 + 节点（Nodes）：节点是一个可执行文件，它可以通过ROS来与其他节点进行通信。
@@ -213,18 +222,58 @@ rosparam能让我们在ROS参数服务器（Parameter Server）上存储和操�
 + msg文件存放在软件包的msg目录下，srv文件则存放在srv目录下。
 
 ## 消息msg
-1. ROS中还有一个特殊的数据类型：Header，它含有时间戳和ROS中广泛使用的坐标帧信息。
-```msg
-    Header header
-    string first_name
-    string last_name
-    uint8 age
-    uint32 score
-    geometry_msgs/PoseWithCovariance pose
-    geometry_msgs/TwistWithCovariance twist
+
+### 消息定义
+
+1. 包括类型和变量名
+
+```
+int32 x
+int32 y
 ```
 
+2. 内置类型和对应关系
+
+![image-20220921095350878](ROS.assets/image-20220921095350878.png)
+
+![image-20220921100253074](ROS.assets/image-20220921100253074.png)
+
+3. ROS中还有一个特殊的数据类型：Header，它含有时间戳和ROS中广泛使用的坐标帧信息。
+
+```msg
+    Header header
+```
+
+Header不是内置类型，被定义在`std_msgs/msg/Header.msg`：
+
+```
+#Standard metadata for higher-level flow data types
+#sequence ID: consecutively increasing ID
+uint32 seq
+#Two-integer timestamp that is expressed as:
+# * stamp.secs: seconds (stamp_secs) since epoch
+# * stamp.nsecs: nanoseconds since stamp_secs
+# time-handling sugar is provided by the client library
+time stamp
+#Frame this data is associated with
+string frame_id
+```
+
+4. 常量
+
+​	常量在定义时还会指定一个值：
+
+```
+int32 X=123
+int32 Y=-123
+string FOO=foo
+string EXAMPLE="#comments" are ignored, and leading and trailing whitespace removed
+```
+
+
+
 ### 创建msg
+
 1. mkdir srv
 2. echo "int64 num" > msg/Num.msg
 1. 确保msg文件能被转换为C++、Python和其他语言的源代码:
@@ -352,7 +401,8 @@ int main(int argc, char **argv)
    * buffer up before throwing some away.
    */
     // 告诉主节点我们将要在chatter话题上发布一个类型为std_msgs/String的消息。这会让主节点告诉任何正在监听chatter的节点，我们将在这一话题上发布数据。第二个参数是发布队列的大小。在本例中，如果我们发布得太快，它将最多缓存1000条消息，不然就会丢弃旧消息。
-  ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
+    // 第三个参数是latch，当为true的时候会将最后一条发布的信息传输给新的订阅者
+  ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000, true);
 	// ros::Rate对象能让你指定循环的频率。它会记录从上次调用Rate::sleep()到现在已经有多长时间，并休眠正确的时间。在本例中，我们告诉它希望以10Hz运行。
   ros::Rate loop_rate(10);
   /**
@@ -728,7 +778,307 @@ $ rosrun beginner_tutorials add_two_ints_client 1 3     # (C++)
 $ rosrun beginner_tutorials add_two_ints_client.py 1 3  # (Python)
 ```
 
+# ROSlaunch
+
+参考：http://wiki.ros.org/roslaunch/XML
+
+1. 运行launch文件：
+
+```
+roslaunch package_name file.launch
+```
+
+2. A roslaunch will automatically start roscore if it detects that it is not already running.
+
+3. 替换变量，将第一个参数的值替换为第二个环境变量参数，第三个为默认参数，在未设置环境变量时生效
+
+```
+<param name="foo" value="$(optenv CONFIG_PATH /home/marvin/ros_workspace)" />
+<param name="foo" value="$(optenv VARIABLE ros rocks)" />
+```
+
+4. `(find pkg)`指定相对于当前包的路径，例如$`(find rospy)/manifest.xml`
+5. 变量可通过`<arg>`指定或者通过命令行指定，使用`$(arg foo)`来赋值
+
+```
+// 直接赋值
+<arg name="foo" default="1" />
+// 通过命令行赋值
+<node name="add_two_ints_client" pkg="beginner_tutorials" type="add_two_ints_client" args="$(arg a) $(arg b)" />
+roslaunch beginner_tutorials launch_file.launch a:=1 b:=5
+```
+
+6. `$(dirname)`返回当前launch文件的绝对路径
+
+```
+<include file="$(dirname)/other.launch" />
+```
+
+7. if和unless来指定是否使用某一标签
+
+```
+<group if="$(arg foo)">
+  <!-- stuff that will only be evaluated if foo is true -->
+</group>
+
+<param name="foo" value="bar" unless="$(arg foo)" />  <!-- Tstuff that will only be evaluated if foo is false -->
+```
+
+## TAG
+
+### node
+
+控制节点的启动和关闭
+
+```
+<node name="listener1" pkg="rospy_tutorials" type="listener.py" args="--test" respawn="true" />
+```
+
+**参数：**
+
+`pkg="mypackage"`
+
+- Package of node.
+
+`type="nodetype"`
+
+- Node type. There must be a corresponding executable with the same name.必须是可执行文件！
+
+`name="nodename"`
+
+- Node name. NOTE: name cannot contain a namespace. Use the `ns` attribute instead.
+
+`args="arg1 arg2 arg3"`*(optional)*
+
+- Pass arguments to node.
+
+`respawn="true"`*(optional, default: False)*
+
+- Restart the node automatically if it quits.
+
+`respawn_delay="30"` *(optional, default 0)* **New in ROS indigo**
+
+- If `respawn` is `true`, wait `respawn_delay` seconds after the node failure is detected before attempting restart.
+
+`required="true"`*(optional)*
+
+- **ROS 0.10**: If node dies, kill entire roslaunch.
+
+`ns="foo"`*(optional)*
+
+- Start the node in the 'foo' namespace.
+
+`clear_params="true|false"`*(optional)*
+
+- Delete all parameters in the node's private namespace before launch.
+
+`output="log|screen"`*(optional)*
+
+- If 'screen', stdout/stderr from the node will be sent to the screen. If 'log', the stdout/stderr output will be sent to a log file in $ROS_HOME/log, and stderr will continue to be sent to screen. The default is 'log'.
+
+`cwd="ROS_HOME|node"`*(optional)*
+
+- If 'node', the working directory of the node will be set to the same directory as the node's executable. In C Turtle, the default is 'ROS_HOME'. In Box Turtle (ROS 1.0.x), the default is 'ros-root'. The use of 'ros-root' is deprecated in C Turtle.
+
+`launch-prefix="prefix arguments"`*(optional)*
+
+- Command/arguments to prepend to node's launch arguments. This is a powerful feature that enables you to enable `gdb`, `valgrind`, `xterm`, `nice`, or other handy tools. See [Roslaunch Nodes in Valgrind or GDB](http://wiki.ros.org/roslaunch/Tutorials/Roslaunch Nodes in Valgrind or GDB) for examples.
+
+`if="true|false"`*(optional)*
+
+- If 'true' the node will be launched as usual. If 'false' the node will not be launched. Can be used to evaluate arguments/parameters and run based on the outcome without modifying the launch file every time.
+
+### include
+
+`<include>` 将另一个roslaunch XML文件导入到当前文件中。
+
+**Attributes**：
+
+`file="$(find pkg-name)/path/filename.xml"`
+
+- Name of file to include.
+
+`ns="foo"` *(optional)*
+
+- Import the file relative to the 'foo' namespace.
+
+`clear_params="true|false"` *(optional Default: false)*
+
+- Delete all parameters in the `<include>`'s namespace before launch. This feature is very dangerous and should be used with caution. `ns` must be specified. Default: `false`.
+
+`pass_all_args="true|false"` *(optional Default: false)* *(New in Indigo and Jade as of `roslaunch` version 1.11.17)*
+
+- If true, then all args set in the current context are added to the child context that is created for processing the included file. You can do this instead of explicitly listing each argument that you want to pass down.
+
+### remap
+
+将话题映射到指定的地方：
+
+```xml
+<remap from="/different_topic" to="/needed_topic"/>
+```
+
+### env
+
+设置节点的环境变量，只能在 `<launch>, <include>, <node> or <machine> tag`中使用
+
+**Attributes**：
+
+`name="environment-variable-name"`
+
+- Environment variable you are setting.
+
+`value="environment-variable-value"`
+
+- Value to set the environment variable to.
+
+### param
+
+```xml
+<launch>
+  <param name="somestring1" value="bar" />
+  <!-- force to string instead of integer -->
+  <param name="somestring2" value="10" type="str" />
+
+  <param name="someinteger1" value="1" type="int" />
+  <param name="someinteger2" value="2" />
+
+  <param name="somefloat1" value="3.14159" type="double" />
+  <param name="somefloat2" value="3.0" />
+
+  <!-- you can set parameters in child namespaces -->
+  <param name="wg/childparam" value="a child namespace parameter" />
+
+  <!-- upload the contents of a file to the server -->
+  <param name="configfile" textfile="$(find roslaunch)/example.xml" />
+  <!-- upload the contents of a file as base64 binary to the server -->
+  <param name="binaryfile" binfile="$(find roslaunch)/example.xml" />
+
+</launch>
+```
+
+1. 定义参数服务器上的参数，可以指定`textfile`, `binfile` or `command` attribute作为参数的值。
+2. 位于`<node>`内的`<param>`标签是私有参数
+
+**Attributes：**
+
+`name="namespace/name"`
+
+- Parameter name. Namespaces can be included in the parameter name, but globally specified names should be avoided.
+
+`value="value"`*(optional)*
+
+- Defines the value of the parameter. If this attribute is omitted, `binfile`, `textfile` or `command` must be specified.
+
+`type="str|int|double|bool|yaml"`*(optional)*
+
+- Specifies the type of the parameter. If you don't specify the type, roslaunch will attempt to automatically determine the type. These rules are very basic:
+  - numbers with '.'s are floating point, integers otherwise;
+  - "true" and "false" are boolean (not case-sensitive).
+  - all other values are strings
+
+`textfile="$(find pkg-name)/path/file.txt"`*(optional)*
+
+- The contents of the file will be read and stored as a string. The file must be locally accessible, though it is strongly recommended that you use the package-relative `$(find)/file.txt` syntax to specify the location.
+
+`binfile="$(find pkg-name)/path/file"`*(optional)*
+
+- The contents of the file will be read and stored as a base64-encoded XML-RPC binary object. The file must be locally accessible, though it is strongly recommended that you use the package-relative `$(find)/file.txt` syntax to specify the location.
+
+`command="$(find pkg-name)/exe '$(find pkg-name)/arg.txt'"`*(optional)*
+
+- The output of the command will be read and stored as a string. It is strongly recommended that you use the package-relative `$(find)/file.txt` syntax to specify file arguments. You should also quote file arguments using single quotes due to XML escaping requirements.
+
+### rosparam
+
+使用YAML文件从参数服务器移除，载入和导出参数：
+
+```
+<rosparam command="load" file="$(find rosparam)/example.yaml" />
+<rosparam command="delete" param="my/param" />
+```
+
+替换参数值：
+
+```
+<rosparam param="a_list">[1, 2, 3, 4]</rosparam>
+<rosparam>
+  a: 1
+  b: 2
+</rosparam>
+<rosparam param="whitelist" subst_value="True">$(arg whitelist)</rosparam>
+```
+
+**Attributes**:
+
+`command="load|dump|delete"` *(optional, default=load)*
+
+- [rosparam](http://wiki.ros.org/rosparam) command.
+
+`file="$(find pkg-name)/path/foo.yaml"` *(`load` or `dump` commands)*
+
+- Name of rosparam file.
+
+`param="param-name"`
+
+- Name of parameter.
+
+`ns="namespace"` *(optional)*
+
+- Scope the parameters to the specified namespace.
+
+`subst_value=true|false` *(optional)*
+
+- Allows use of [substitution args](http://wiki.ros.org/roslaunch/XML#substitution_args) in the YAML text.
+
+### group
+
+Apply settings to a group of nodes.
+
+**Attributes**:
+
+`ns="namespace"` *(optional)*
+
+- Assign the group of nodes to the specified namespace. The namespace can be global or relative, though global namespaces are discouraged.
+
+`clear_params="true|false"` *(optional)*
+
+- Delete all parameters in the group's namespace before launch. This feature is very dangerous and should be used with caution. `ns` must be specified.
+
+
+
+## 实例
+
+```xml
+<launch>
+    <!-- a basic listener node -->
+    <node name="listener-1" pkg="rospy_tutorials" type="listener"/>
+    <!-- pass args to the listener node -->
+    <node name="listener-2" pkg="rospy_tutorials" type="listener" args="-foo arg2"/>
+    <!-- a respawn-able listener node -->
+    <node name="listener-3" pkg="rospy_tutorials" type="listener" respawn="true"/>
+    <!-- start listener node in the 'wg1' namespace -->
+    <node ns="wg1" name="listener-wg1" pkg="rospy_tutorials" type="listener" respawn="true"/>
+    <!-- start a group of nodes in the 'wg2' namespace -->
+    <group ns="wg2">
+        <!-- remap applies to all future statements in this scope. -->
+        <remap from="chatter" to="hello"/>
+        <node pkg="rospy_tutorials" type="listener" name="listener" args="--test" respawn="true"/>
+        <node pkg="rospy_tutorials" type="talker" name="talker">
+            <!-- set a private parameter for the node -->
+            <param name="talker_1_param" value="a value"/>
+            <!-- nodes can have their own remap args -->
+            <remap from="chatter" to="hello-1"/>
+            <!-- you can set environment variables for a node -->
+            <env name="ENV_EXAMPLE" value="some value"/>
+        </node>
+    </group>
+</launch>
+
+```
+
 # 记录和回放数据
+
 1. 记录发布的所有数据
 ```bash
 rosbag record -a
@@ -757,6 +1107,8 @@ rostopic echo /obs1/gps/fix | tee topic1.yaml
 
 
 # ROS中的TF
+
+## 基本定义
 
 + ROS中的TF(transform)是一个可以让用户随时记录多个坐标系的软件包
 + TF本质是树状的数据结构
@@ -800,6 +1152,292 @@ rosrun tf tf_echo [reference_frame] [target_frame]
 ```
 
 4. 可使用rviz中的TFTrajectory显示运动轨迹（需要将固定坐标系设置为世界坐标系）
+
+## tf2 static broadcaster
+
+两种使用方式：
+
+1.  使用launch文件
+
+```
+<launch>
+<node pkg="tf2_ros" type="static_transform_publisher" name="link1_broadcaster" args="1 0 0 0 0 0 1 link1_parent link1" />
+</launch>
+```
+
+2. 使用命令
+
+```
+static_transform_publisher x y z yaw pitch roll frame_id child_frame_id
+```
+
+教程步骤：
+
+```
+catkin_create_pkg learning_tf2 tf2 tf2_ros roscpp rospy turtlesim
+roscd learning_tf2
+```
+
+1. `vim src/static_turtle_tf2_broadcaster.cpp`
+
+```cpp
+#include <ros/ros.h>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <cstdio>
+#include <tf2/LinearMath/Quaternion.h>
+
+
+std::string static_turtle_name;
+
+int main(int argc, char **argv)
+{
+  ros::init(argc,argv, "my_static_tf2_broadcaster");
+  if(argc != 8)
+  {
+    ROS_ERROR("Invalid number of parameters\nusage: static_turtle_tf2_broadcaster child_frame_name x y z roll pitch yaw");
+    return -1;
+  }
+  if(strcmp(argv[1],"world")==0)
+  {
+    ROS_ERROR("Your static turtle name cannot be 'world'");
+    return -1;
+
+  }
+  static_turtle_name = argv[1];
+  // static_broadcaster是广播器，static_transformStamped是广播的消息
+  static tf2_ros::StaticTransformBroadcaster static_broadcaster;
+  geometry_msgs::TransformStamped static_transformStamped;
+
+  static_transformStamped.header.stamp = ros::Time::now();
+  static_transformStamped.header.frame_id = "world";
+  static_transformStamped.child_frame_id = static_turtle_name;
+  static_transformStamped.transform.translation.x = atof(argv[2]);
+  static_transformStamped.transform.translation.y = atof(argv[3]);
+  static_transformStamped.transform.translation.z = atof(argv[4]);
+  tf2::Quaternion quat;
+  quat.setRPY(atof(argv[5]), atof(argv[6]), atof(argv[7]));
+  static_transformStamped.transform.rotation.x = quat.x();
+  static_transformStamped.transform.rotation.y = quat.y();
+  static_transformStamped.transform.rotation.z = quat.z();
+  static_transformStamped.transform.rotation.w = quat.w();
+  static_broadcaster.sendTransform(static_transformStamped);
+  ROS_INFO("Spinning until killed publishing %s to world", static_turtle_name.c_str());
+  ros::spin();
+  return 0;
+};
+```
+
+2. CMakeLists
+
+```
+add_executable(static_turtle_tf2_broadcaster src/static_turtle_tf2_broadcaster.cpp)
+target_link_libraries(static_turtle_tf2_broadcaster  ${catkin_LIBRARIES} )
+```
+
+3. 结果
+
+```
+roscore
+rosrun learning_tf2 static_turtle_tf2_broadcaster mystaticturtle 0 0 1 0 0 0
+rostopic echo /tf_static
+```
+
+## tf2 broadcaster
+
+1. ```
+   catkin_create_pkg learning_tf2 tf2 tf2_ros roscpp rospy turtlesim
+   roscd learning_tf2
+   ```
+
+2. `vim src/turtle_tf2_broadcaster.cpp`
+
+```cpp
+#include <ros/ros.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <turtlesim/Pose.h>
+
+std::string turtle_name;
+
+void poseCallback(const turtlesim::PoseConstPtr& msg){
+  static tf2_ros::TransformBroadcaster br;
+  geometry_msgs::TransformStamped transformStamped;
+  
+  transformStamped.header.stamp = ros::Time::now();
+  transformStamped.header.frame_id = "world";
+  transformStamped.child_frame_id = turtle_name;
+  transformStamped.transform.translation.x = msg->x;
+  transformStamped.transform.translation.y = msg->y;
+  transformStamped.transform.translation.z = 0.0;
+  tf2::Quaternion q;
+  q.setRPY(0, 0, msg->theta);
+  transformStamped.transform.rotation.x = q.x();
+  transformStamped.transform.rotation.y = q.y();
+  transformStamped.transform.rotation.z = q.z();
+  transformStamped.transform.rotation.w = q.w();
+
+  br.sendTransform(transformStamped);
+}
+
+int main(int argc, char** argv){
+  ros::init(argc, argv, "my_tf2_broadcaster");
+
+  ros::NodeHandle private_node("~");
+  if (! private_node.hasParam("turtle"))
+  {
+    if (argc != 2){ROS_ERROR("need turtle name as argument"); return -1;};
+    turtle_name = argv[1];
+  }
+  else
+  {
+    private_node.getParam("turtle", turtle_name);
+  }
+    
+  ros::NodeHandle node;
+  // 接受到消息后，使用回调函数计算世界坐标系和该乌龟的变换关系
+  ros::Subscriber sub = node.subscribe(turtle_name+"/pose", 10, &poseCallback);
+
+  ros::spin();
+  return 0;
+};
+```
+
+3. `vim CMakeLists.txt`
+
+```
+add_executable(turtle_tf2_broadcaster src/turtle_tf2_broadcaster.cpp)
+target_link_libraries(turtle_tf2_broadcaster
+ ${catkin_LIBRARIES}
+)
+```
+
+4. ```
+   catkin_make
+   ```
+
+5. `vim start_demo.launch`
+
+```xml
+  <launch>
+     <!-- Turtlesim Node-->
+    <node pkg="turtlesim" type="turtlesim_node" name="sim"/>
+
+    <node pkg="turtlesim" type="turtle_teleop_key" name="teleop" output="screen"/>
+    <!-- Axes -->
+    <param name="scale_linear" value="2" type="double"/>
+    <param name="scale_angular" value="2" type="double"/>
+
+    <node pkg="learning_tf2" type="turtle_tf2_broadcaster"
+          args="/turtle1" name="turtle1_tf2_broadcaster" />
+    <node pkg="learning_tf2" type="turtle_tf2_broadcaster"
+          args="/turtle2" name="turtle2_tf2_broadcaster" />
+
+  </launch>
+```
+
+`vim CMakeLists.txt`
+
+```
+## Mark other files for installation (e.g. launch and bag files, etc.)
+install(FILES
+ start_demo.launch
+ # myfile2
+ DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+```
+
+6. 运行文件并检查结果
+
+```
+roslaunch learning_tf2 start_demo.launch
+rosrun tf tf_echo /world /turtle1
+```
+
+## tf2 listener
+
+1. `vim src/turtle_tf2_listener.cpp`
+
+```CPP
+#include <ros/ros.h>
+#include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <turtlesim/Spawn.h>
+
+int main(int argc, char** argv){
+  ros::init(argc, argv, "my_tf2_listener");
+
+  ros::NodeHandle node;
+
+  ros::service::waitForService("spawn");
+  ros::ServiceClient spawner =
+    node.serviceClient<turtlesim::Spawn>("spawn");
+  turtlesim::Spawn turtle;
+  turtle.request.x = 4;
+  turtle.request.y = 2;
+  turtle.request.theta = 0;
+  turtle.request.name = "turtle2";
+  spawner.call(turtle);
+
+  ros::Publisher turtle_vel =
+    node.advertise<geometry_msgs::Twist>("turtle2/cmd_vel", 10);
+
+  tf2_ros::Buffer tfBuffer;
+  tf2_ros::TransformListener tfListener(tfBuffer);
+
+  ros::Rate rate(10.0);
+  while (node.ok()){
+    geometry_msgs::TransformStamped transformStamped;
+    try{
+      transformStamped = tfBuffer.lookupTransform("turtle2", "turtle1", ros::Time(0));
+    }
+    catch (tf2::TransformException &ex) {
+      ROS_WARN("%s",ex.what());
+      ros::Duration(1.0).sleep();
+      continue;
+    }
+
+    geometry_msgs::Twist vel_msg;
+
+    vel_msg.angular.z = 4.0 * atan2(transformStamped.transform.translation.y,
+                                    transformStamped.transform.translation.x);
+    vel_msg.linear.x = 0.5 * sqrt(pow(transformStamped.transform.translation.x, 2) +
+                                  pow(transformStamped.transform.translation.y, 2));
+    turtle_vel.publish(vel_msg);
+
+    rate.sleep();
+  }
+  return 0;
+};
+```
+
+2. CMakeLists.txt
+
+```
+add_executable(turtle_tf2_listener src/turtle_tf2_listener.cpp)
+target_link_libraries(turtle_tf2_listener
+ ${catkin_LIBRARIES}
+)
+```
+
+3. 加上
+
+```
+  <launch>
+    ...
+    <node pkg="learning_tf2" type="turtle_tf2_listener"
+          name="listener" />
+  </launch>
+```
+
+4. ```
+   catkin_make
+   roslaunch learning_tf2 start_demo.launch
+   ```
+
+   
 
 # Rviz
 

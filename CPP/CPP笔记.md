@@ -1,4 +1,24 @@
-# Trick
+# 基本
+
+## 注释
+
+> 好的注释解释代码为什么这么做而不是这段代码是什么
+
+Bad comment:
+
+```cpp
+// Calculate the cost of the items
+cost = quantity * 2 * storePrice;
+```
+
+Reason: We can see that this is a cost calculation, but why is quantity multiplied by 2?
+
+Good comment:
+
+```cpp
+// We need to multiply quantity by 2 here because they are bought in pairs
+cost = quantity * 2 * storePrice;
+```
 
 ## --a和a--
 
@@ -8,7 +28,7 @@ a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。
 
 
 
-## main命令行参数
+## main参数
 
 > int argc:          英文名为arguments count(参数计数)
 > char** argv:    英文名为arguments value/vector(参数值)
@@ -35,26 +55,48 @@ system("pause");
 
 
 
+
+
 # 变量
 
 ## 初始化
+
++ Brace initialization，也叫**uniform initialization**或**list initialization**
++ **Copy initialization**
++ 前者不允许narrowing conversions，例如从float转为int
++ 更倾向使用前者
 
 ```c++
 int main()
 {
 // 三种方式
-int x = 123;
-int y{ 123 };
-int z = { 123 };
+int x = 123;   // Copy initialization
+int y{ 123 };  // Brace initialization
+int z = { };   // 初始化为0
+
+// 初始化多个变量
+int a, b = 5; // wrong (a is not initialized!)
+int a = 5, b = 5; // correct
+int a, b( 5 );
+int c, d{ 5 };
 }
 ```
 
 ## 基本类型
 
+> \_t代表这是一个类型，但是很多类型没有\_t
+>
+> C++ only guarantees that integers will have a certain minimum size, not that they will have a specific size.
+
+![image-20220922110652538](CPP笔记.assets/image-20220922110652538.png)
+
 ```c++
 char c = 'a';
 int y = -256;
-double d = 3.14;
+unsigned int u { 5u }; // 5u means the number 5 as an unsigned int
+double d = 3.14;  // 浮点数默认是double类型
+float e = 3.14f;  // 加上f以指定为float类型
+float e = 3.14;  // 不加上f会导致3.14转为double再转为float，由此降低精度
 std::string s = "123";
 //常量，定义时必须先初始化
 const int x =10
@@ -63,6 +105,81 @@ constexpr int z = 20
 constexpr int z1 = z
 constexpr int z2 = y // 错误，编译时还不知道y的值
 ```
+
+### NaN and Inf
+
++ Inf可正可负
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    double zero {0.0};
+    double posinf { 5.0 / zero }; // positive infinity
+    std::cout << posinf << '\n';
+
+    double neginf { -5.0 / zero }; // negative infinity
+    std::cout << neginf << '\n';
+
+    double nan { zero / zero }; // not a number (mathematically invalid)
+    std::cout << nan << '\n';
+
+    return 0;
+}
+```
+
+```
+1.#INF
+-1.#INF
+1.#IND
+```
+
+### 常量
+
++ 分为运行时常量和编译时常量，运行时常量的值只在运行时才知道，而编译时常量在编译时就知道，因此编译时常量更节省时间。
++ constexpr常量表达式，只能赋予给编译时常量（代替const），否则报错。
+
+```cpp
+#include <iostream>
+
+int five()
+{
+    return 5;
+}
+
+int main()
+{
+    constexpr double gravity { 9.8 }; // ok: 9.8 is a constant expression
+    constexpr int sum { 4 + 5 };      // ok: 4 + 5 is a constant expression
+    constexpr int something { sum };  // ok: sum is a constant expression
+
+    std::cout << "Enter your age: ";
+    int age{};
+    std::cin >> age;
+
+    constexpr int myAge { age };      // compile error: age is not a constant expression
+    constexpr int f { five() };       // compile error: return value of five() is not a constant expression
+
+    return 0;
+}
+```
+
+### 字面符
+
+**Literals** are unnamed values inserted directly into the code. 
+
+```cpp
+return 5;                   // 5 is an integer literal
+bool myNameIsAlex { true }; // true is a boolean literal
+std::cout << 3.4;           // 3.4 is a double literal
+```
+
+通过后缀来指定字面符类型
+
+![image-20220922160953155](CPP笔记.assets/image-20220922160953155.png)
+
+
 
 ### 自动类型推断
 
@@ -128,6 +245,26 @@ std::cout << "The value of an unsigned long integer variable is: " << x;
 }
 ```
 
+## utils
+
+### sizeof
+
+获取一个数据占用的字节数：
+
+```cpp
+std::cout << "char32_t:\t" << sizeof(char32_t) << " bytes\n";
+```
+
+### size_t
+
+**std::size_t** is defined as an unsigned integral type, and it is typically used to represent the size or length of objects.
+
+```
+for(size_t i=0;i<10;i++){...}
+```
+
+
+
 ## 数组
 
 ```c++
@@ -142,8 +279,14 @@ std::cout << sizeof a/sizeof a[0];
 
 ## 字符串
 
++ `std::string`的变量赋值会产生一个新的copy，开销很大，更倾向于使用`std::string_view`
+
 ```c++
 std::string s= "asddasdad";
+
+// 获取字符串长度
+std::cout << s.length();  // 返回unsigned int
+std::cout << std::ssize(s);  // In C++20
 
 // 获取字符子串，从2开始的3个字符
 std::cout << s.substr(2,3);
@@ -161,6 +304,60 @@ else
     std::cout << "The substring is not found.";
 }
 ```
+
+### 字面符
+
+使用std::string的字面符必须加上`using namespace std::literals;`
+
+```cpp
+#include <iostream>
+#include <string>      // for std::string
+#include <string_view> // for std::string_view
+
+int main()
+{
+    using namespace std::literals; // easiest way to access the s and sv suffixes
+	constexpr std::string name{ "Alex"s }; // compile error，只在C++20支持
+	constexpr std::string_view name{ "Alex"s }; // 可用
+    std::cout << "foo\n";   // no suffix is a C-style string literal
+    std::cout << "goo\n"s;  // s suffix is a std::string literal
+    std::cout << "moo\n"sv; // sv suffix is a std::string_view literal
+
+    return 0;
+};
+```
+
+### string_view
+
++ C++17支持
++ 只提供可读权限，不会产生新的copy，所以在字符串不需要修改时倾向于使用string_view
++ **Do not return a std::string_view**
+
+```cpp
+#include <iostream>
+#include <string>
+#include <string_view>
+
+void printString(std::string str)
+{
+    std::cout << str << '\n';
+}
+
+int main()
+{
+  std::string_view sv{ "balloon" };
+
+  std::string str{ sv }; // okay, we can create std::string using std::string_view initializer
+
+  // printString(sv);   // compile error: won't implicitly convert std::string_view to a std::string
+
+  printString(static_cast<std::string>(sv)); // okay, we can explicitly cast a std::string_view to a std::string
+
+  return 0;
+}
+```
+
+
 
 ### 读取空格划分的字符串
 
@@ -188,6 +385,10 @@ else
         cloud->push_back(temp_point);//从点云最后面插入一点
     }
 ```
+
+
+
+
 
 ### 类型转换
 
@@ -493,21 +694,6 @@ int main()
 
 
 
-# 输入与输出
-
-```c++
-int x =0;
-char y;
-// 分两次输入
-std::cin >>x >>y;  
-std::cout << x <<"\n"<<y;
-
-// 使用getline来获取有空格的输入（直接使用cin只会获取到空格之前的字符串）
-std::string s;
-std::getline(std::cin,s);
-std::cout << s;
-```
-
 # 函数
 
 1. 最好先声明，再定义后再使用
@@ -561,6 +747,31 @@ void myprint(char param);
 void myprint(int param);
 void myprint(double param);
 ```
+
+## 函数声明
+
+> 函数声明用来表示函数存在，同时声明其类型
+
+> 可以解决函数在编译时候的顺序问题，如下所示，add的定义在main之后，但是前面声明过，所以能找到。
+
+```c++
+#include <iostream>
+
+int add(int x, int y); // forward declaration of add() (using a function declaration)
+
+int main()
+{
+    std::cout << "The sum of 3 and 4 is: " << add(3, 4) << '\n'; // this works because we forward declared add() above
+    return 0;
+}
+
+int add(int x, int y) // even though the body of add() isn't defined until here
+{
+    return x + y;
+}
+```
+
+
 
 # 面向对象
 
@@ -1032,13 +1243,21 @@ int main()
 
 # 代码组织
 
-### **头文件和源文件：**
+## 头文件
 
-By convention, there are two kinds of files into which we can store our C++ source: ==**header files (headers) and source files**.==
+>  Header files usually have the .h (or .hpp) extension. Source files are files where we can store our definitions and the main program. They usually have the .cpp (or .cc) extension.
 
-> Header files usually have the .h (or .hpp) extension. Source files are files where we can store our definitions and the main program. They usually have the .cpp (or .cc) extension.
++ By convention, there are two kinds of files into which we can store our C++ source: ==**header files (headers) and source files**.==
 
-## 不同的头文件命名规则
++ 通常将声明放在头文件中，然后在需要时引入，这样可以减少代码
++ 编译时，首先会将引入头文件中的声明插入到引入指令的位置，这样才能在链接时找到其所需要的库代码
+
+![image-20220919190147424](CPP笔记.assets/image-20220919190147424.png)
+
++ 头文件通常包含：header guard和声明内容
++ 引入头文件：`#include "add.h"`，其编译流程如下：	![image-20220919191053425](CPP笔记.assets/image-20220919191053425.png)
+
+### 不同的头文件命名规则
 
 To include user-defined header files, we use the #include statement, followed by a full header name with extension enclosed in double-quotes. Example:
 
@@ -1048,15 +1267,45 @@ To include user-defined header files, we use the #include statement, followed by
 #include "otherheader.h"
 ```
 
-
-
 ==We should put the declarations and constants into header files and put definitions and executable code in source files.==
 
+### 有.h和没有的区别
 
+> The header files with the *.h* extension define their names in the global namespace, and may optionally define them in the *std* namespace as well.
+>
+> The header files without the *.h* extension will define their names in the *std* namespace, and may optionally define them in the global namespace as well.
+
+### 引入头文件的顺序
+
+1. The paired header file
+2. Other headers from your project
+3. 3rd party library headers
+4. Standard library headers
+
+### Header guards
+
++ All of your header files should have header guards on them.
++ 用于保证在一个cpp文件中不引入同一个头文件两次以上
+
+```cpp
+#ifndef SQUARE_H
+#define SQUARE_H
+
+int getSquareSides()
+{
+    return 4;
+}
+
+#endif
+```
 
 
 
 ## 命名空间
+
++ The :: symbol is an operator called the **scope resolution operator**.
++ ::左边是命名空间
++ 使用命名空间缩写：`using namespace std`（不建议使用）
 
 ```c++
 #include <iostream>
@@ -1127,6 +1376,50 @@ int main()
 
 
 # I/O流
+
+## 命令行输入和输出
+
+> 调试异常时最好使用std::cerr来立即获得输出
+
+```CPP
+#include <iostream> 
+
+int x =0;
+char y;
+// 分两次输入
+std::cin >>x >>y;  
+// 两者不同的是endl会flush输出，即让输出结果立即显示（不会滚动）
+std::cout << x <<"\n"<<y;  // 使用\n换行，推荐使用
+std::cout << x <<std::endl<<y;  // 使用endl换行
+
+// 使用cin获取字符串
+int x{ }; // define variable x to hold user input (and zero-initialize it)
+std::cin >> x; // get number from keyboard and store it in variable x
+
+// 使用getline来获取有空格的输入（直接使用cin只会获取到空格之前的字符串）
+// 使用std::ws来控制输入的前缀不包含空格（换行等），若没有std::ws，可能会错误识别到上一次输入结束时的换行
+std::string s;
+std::getline(std::cin >> std::ws, s);
+std::cout << s;
+```
+
+### 设置输出精度
+
+```cpp
+#include <iostream>
+#include <iomanip> // for output manipulator std::setprecision()
+
+int main()
+{
+    std::cout << std::setprecision(16); // show 16 digits of precision
+    std::cout << 3.33333333333333333333333333333333333333f <<'\n'; // f suffix means float
+    std::cout << 3.33333333333333333333333333333333333333 << '\n'; // no suffix means double
+
+    return 0;
+}
+```
+
+
 
 ## 文件流
 
@@ -1696,9 +1989,114 @@ accumulate(num.begin(), num.end(), 0)
    }
    ```
 
-   
 
-# CMake
+# 编译
+
+## 预处理器：Preprocessor
+
++ 预处理指令以#开头
+
++ 宏定义：第一个没有替换文本，identifier一般是大写
+
+  > 替换文本的宏定义已经不必要了，可以用常量替换
+
+  ```
+  #define identifier
+  #define identifier substitution_text
+  ```
+
++ 预处理的宏定义只在单个文件生效，即scope只在单文件内
+
+### 条件编译
+
+> #ifdef让预处理器检查这个标志符是否预定义，若定义，则到#endif之前的代码会被编译，反之。
+
+```c++
+#include <iostream>
+
+#define PRINT_JOE
+
+int main()
+{
+#ifdef PRINT_JOE
+    std::cout << "Joe\n"; // will be compiled since PRINT_JOE is defined
+#endif
+
+#ifdef PRINT_BOB
+    std::cout << "Bob\n"; // will be ignored since PRINT_BOB is not defined
+#endif
+
+    return 0;
+}
+```
+
+使用`#if 0`也可用来控制一些代码块不编译（类似于多行注释，或者注释有多行注释的代码块，因为多行注释不能嵌套）
+
+```c++
+#include <iostream>
+
+int main()
+{
+    std::cout << "Joe\n";
+
+#if 0 // Don't compile anything starting here
+    std::cout << "Bob\n";
+    /* Some
+     * multi-line
+     * comment here
+     */
+    std::cout << "Steve\n";
+#endif // until this point
+
+    return 0;
+}
+```
+
+
+
+## g++
+
++ 使用`g++ main.cpp add.cpp -o main`编译
++ 在main.cpp中声明add以使用其他文件的定义
+
+main.cpp
+
+```c++
+#include <iostream>
+
+int add(int x, int y); // needed so main.cpp knows that add() is a function defined elsewhere
+
+int main()
+{
+    std::cout << "The sum of 3 and 4 is: " << add(3, 4) << '\n';
+    return 0;
+}
+```
+
+add.cpp
+
+```c++
+int add(int x, int y)
+{
+    return x + y;
+}
+```
+
+## 参数
+
+### -o
+
+> 表示转为可执行文件的名字
+
+### -l
+
+> use the -I option to specify an alternate include directory.
+
+```cpp
+g++ -o main -I/source/includes main.cpp
+```
+
+## CMake
 
 > 只有带main函数的文件会生成可执行程序，其余代码打包成库。
 >
@@ -1720,6 +2118,11 @@ cmake_minimum_required(VERSION 2.8)
 
 # 声明一个 cmake 工程
 project(HelloSLAM)
+
+# 设置为发布模式
+set(CMAKE_BUILD_TYPE "Release")
+# 制定使用版本
+set(CMAKE_CXX_FLAGS "-std=c++14 -O3")
 
 # 设置编译模式
 set(CMAKE_BUILD_TYPE "Debug")
