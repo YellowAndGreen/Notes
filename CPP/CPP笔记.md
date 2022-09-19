@@ -1,4 +1,24 @@
-# Trick
+# 基本
+
+## 注释
+
+> 好的注释解释代码为什么这么做而不是这段代码是什么
+
+Bad comment:
+
+```cpp
+// Calculate the cost of the items
+cost = quantity * 2 * storePrice;
+```
+
+Reason: We can see that this is a cost calculation, but why is quantity multiplied by 2?
+
+Good comment:
+
+```cpp
+// We need to multiply quantity by 2 here because they are bought in pairs
+cost = quantity * 2 * storePrice;
+```
 
 ## --a和a--
 
@@ -8,7 +28,7 @@ a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。
 
 
 
-## main命令行参数
+## main参数
 
 > int argc:          英文名为arguments count(参数计数)
 > char** argv:    英文名为arguments value/vector(参数值)
@@ -35,17 +55,30 @@ system("pause");
 
 
 
+
+
 # 变量
 
 ## 初始化
+
++ Brace initialization，也叫**uniform initialization**或**list initialization**
++ **Copy initialization**
++ 前者不允许narrowing conversions，例如从float转为int
++ 更倾向使用前者
 
 ```c++
 int main()
 {
 // 三种方式
-int x = 123;
-int y{ 123 };
-int z = { 123 };
+int x = 123;   // Copy initialization
+int y{ 123 };  // Brace initialization
+int z = { };   // 初始化为0
+
+// 初始化多个变量
+int a, b = 5; // wrong (a is not initialized!)
+int a = 5, b = 5; // correct
+int a, b( 5 );
+int c, d{ 5 };
 }
 ```
 
@@ -496,11 +529,19 @@ int main()
 # 输入与输出
 
 ```c++
+#include <iostream> 
+
 int x =0;
 char y;
 // 分两次输入
 std::cin >>x >>y;  
-std::cout << x <<"\n"<<y;
+// 两者不同的是endl会flush输出，即让输出结果立即显示（不会滚动）
+std::cout << x <<"\n"<<y;  // 使用\n换行，推荐使用
+std::cout << x <<std::endl<<y;  // 使用endl换行
+
+// 使用cin获取字符串
+int x{ }; // define variable x to hold user input (and zero-initialize it)
+std::cin >> x; // get number from keyboard and store it in variable x
 
 // 使用getline来获取有空格的输入（直接使用cin只会获取到空格之前的字符串）
 std::string s;
@@ -561,6 +602,31 @@ void myprint(char param);
 void myprint(int param);
 void myprint(double param);
 ```
+
+## 函数声明
+
+> 函数声明用来表示函数存在，同时声明其类型
+
+> 可以解决函数在编译时候的顺序问题，如下所示，add的定义在main之后，但是前面声明过，所以能找到。
+
+```c++
+#include <iostream>
+
+int add(int x, int y); // forward declaration of add() (using a function declaration)
+
+int main()
+{
+    std::cout << "The sum of 3 and 4 is: " << add(3, 4) << '\n'; // this works because we forward declared add() above
+    return 0;
+}
+
+int add(int x, int y) // even though the body of add() isn't defined until here
+{
+    return x + y;
+}
+```
+
+
 
 # 面向对象
 
@@ -1032,13 +1098,21 @@ int main()
 
 # 代码组织
 
-### **头文件和源文件：**
+## 头文件
 
-By convention, there are two kinds of files into which we can store our C++ source: ==**header files (headers) and source files**.==
+>  Header files usually have the .h (or .hpp) extension. Source files are files where we can store our definitions and the main program. They usually have the .cpp (or .cc) extension.
 
-> Header files usually have the .h (or .hpp) extension. Source files are files where we can store our definitions and the main program. They usually have the .cpp (or .cc) extension.
++ By convention, there are two kinds of files into which we can store our C++ source: ==**header files (headers) and source files**.==
 
-## 不同的头文件命名规则
++ 通常将声明放在头文件中，然后在需要时引入，这样可以减少代码
++ 编译时，首先会将引入头文件中的声明插入到引入指令的位置，这样才能在链接时找到其所需要的库代码
+
+![image-20220919190147424](CPP笔记.assets/image-20220919190147424.png)
+
++ 头文件通常包含：header guard和声明内容
++ 引入头文件：`#include "add.h"`，其编译流程如下：	![image-20220919191053425](CPP笔记.assets/image-20220919191053425.png)
+
+### 不同的头文件命名规则
 
 To include user-defined header files, we use the #include statement, followed by a full header name with extension enclosed in double-quotes. Example:
 
@@ -1048,15 +1122,45 @@ To include user-defined header files, we use the #include statement, followed by
 #include "otherheader.h"
 ```
 
-
-
 ==We should put the declarations and constants into header files and put definitions and executable code in source files.==
 
+### 有.h和没有的区别
 
+> The header files with the *.h* extension define their names in the global namespace, and may optionally define them in the *std* namespace as well.
+>
+> The header files without the *.h* extension will define their names in the *std* namespace, and may optionally define them in the global namespace as well.
+
+### 引入头文件的顺序
+
+1. The paired header file
+2. Other headers from your project
+3. 3rd party library headers
+4. Standard library headers
+
+### Header guards
+
++ All of your header files should have header guards on them.
++ 用于保证在一个cpp文件中不引入同一个头文件两次以上
+
+```cpp
+#ifndef SQUARE_H
+#define SQUARE_H
+
+int getSquareSides()
+{
+    return 4;
+}
+
+#endif
+```
 
 
 
 ## 命名空间
+
++ The :: symbol is an operator called the **scope resolution operator**.
++ ::左边是命名空间
++ 使用命名空间缩写：`using namespace std`（不建议使用）
 
 ```c++
 #include <iostream>
@@ -1696,9 +1800,114 @@ accumulate(num.begin(), num.end(), 0)
    }
    ```
 
-   
 
-# CMake
+# 编译
+
+## 预处理器：Preprocessor
+
++ 预处理指令以#开头
+
++ 宏定义：第一个没有替换文本，identifier一般是大写
+
+  > 替换文本的宏定义已经不必要了，可以用常量替换
+
+  ```
+  #define identifier
+  #define identifier substitution_text
+  ```
+
++ 预处理的宏定义只在单个文件生效，即scope只在单文件内
+
+### 条件编译
+
+> #ifdef让预处理器检查这个标志符是否预定义，若定义，则到#endif之前的代码会被编译，反之。
+
+```c++
+#include <iostream>
+
+#define PRINT_JOE
+
+int main()
+{
+#ifdef PRINT_JOE
+    std::cout << "Joe\n"; // will be compiled since PRINT_JOE is defined
+#endif
+
+#ifdef PRINT_BOB
+    std::cout << "Bob\n"; // will be ignored since PRINT_BOB is not defined
+#endif
+
+    return 0;
+}
+```
+
+使用`#if 0`也可用来控制一些代码块不编译（类似于多行注释，或者注释有多行注释的代码块，因为多行注释不能嵌套）
+
+```c++
+#include <iostream>
+
+int main()
+{
+    std::cout << "Joe\n";
+
+#if 0 // Don't compile anything starting here
+    std::cout << "Bob\n";
+    /* Some
+     * multi-line
+     * comment here
+     */
+    std::cout << "Steve\n";
+#endif // until this point
+
+    return 0;
+}
+```
+
+
+
+## g++
+
++ 使用`g++ main.cpp add.cpp -o main`编译
++ 在main.cpp中声明add以使用其他文件的定义
+
+main.cpp
+
+```c++
+#include <iostream>
+
+int add(int x, int y); // needed so main.cpp knows that add() is a function defined elsewhere
+
+int main()
+{
+    std::cout << "The sum of 3 and 4 is: " << add(3, 4) << '\n';
+    return 0;
+}
+```
+
+add.cpp
+
+```c++
+int add(int x, int y)
+{
+    return x + y;
+}
+```
+
+## 参数
+
+### -o
+
+> 表示转为可执行文件的名字
+
+### -l
+
+> use the -I option to specify an alternate include directory.
+
+```cpp
+g++ -o main -I/source/includes main.cpp
+```
+
+## CMake
 
 > 只有带main函数的文件会生成可执行程序，其余代码打包成库。
 >
@@ -1720,6 +1929,11 @@ cmake_minimum_required(VERSION 2.8)
 
 # 声明一个 cmake 工程
 project(HelloSLAM)
+
+# 设置为发布模式
+set(CMAKE_BUILD_TYPE "Release")
+# 制定使用版本
+set(CMAKE_CXX_FLAGS "-std=c++14 -O3")
 
 # 设置编译模式
 set(CMAKE_BUILD_TYPE "Debug")
