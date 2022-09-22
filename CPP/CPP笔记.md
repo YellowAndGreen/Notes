@@ -694,6 +694,29 @@ int main()
 
 
 
+# 输入与输出
+
+```c++
+#include <iostream> 
+
+int x =0;
+char y;
+// 分两次输入
+std::cin >>x >>y;  
+// 两者不同的是endl会flush输出，即让输出结果立即显示（不会滚动）
+std::cout << x <<"\n"<<y;  // 使用\n换行，推荐使用
+std::cout << x <<std::endl<<y;  // 使用endl换行
+
+// 使用cin获取字符串
+int x{ }; // define variable x to hold user input (and zero-initialize it)
+std::cin >> x; // get number from keyboard and store it in variable x
+
+// 使用getline来获取有空格的输入（直接使用cin只会获取到空格之前的字符串）
+std::string s;
+std::getline(std::cin,s);
+std::cout << s;
+```
+
 # 函数
 
 1. 最好先声明，再定义后再使用
