@@ -24,9 +24,9 @@ cost = quantity * 2 * storePrice;
 
 a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。如果只是希望增加a 的值，而不需要返回值，则推荐使用++a，其运行速度会略快一些。
 
-**因为先加1再输出的方式省去了将其放入寄存器的时间**
+**因为先加1再输出的方式省去了对a复制一个新的copy，以及之后删除这个临时copy的时间和空间**
 
-
+![image-20220923220015172](CPP笔记.assets/image-20220923220015172.png)
 
 ## main参数
 
@@ -139,6 +139,7 @@ int main()
 
 + 分为运行时常量和编译时常量，运行时常量的值只在运行时才知道，而编译时常量在编译时就知道，因此编译时常量更节省时间。
 + constexpr常量表达式，只能赋予给编译时常量（代替const），否则报错。
++ ==全局常量必须初始化==（在函数之外无法对其赋值）
 
 ```cpp
 #include <iostream>
@@ -164,6 +165,8 @@ int main()
     return 0;
 }
 ```
+
+
 
 ### 字面符
 
@@ -641,9 +644,22 @@ int main()
 
 # 流程控制
 
+## 条件操作符
+
+![image-20220923220927776](CPP笔记.assets/image-20220923220927776.png)
+
+```cpp
+larger = (x > y) ? x : y;
+
+std::cout << (x > y) ? x : y << '\n';  // 可能出错
+std::cout << ((x > y) ? x : y) << '\n';  //应该始终用括号包括条件操作符
+```
+
+
+
 ## if
 
-> 逻辑运算符：&&，||，!，^
+> 逻辑运算符：&&，||，!，^(异或操作)
 
 > 条件表达式：`condition ? exp1 : exp2` 若条件符合则exp1，反之
 
@@ -659,7 +675,29 @@ else
 }
 ```
 
+在if else中定义的变量会在判断语句结束后销毁，因此以下代码编译失败。
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    constexpr bool inBigClassroom { false };
+
+    if (inBigClassroom)
+        constexpr int classSize { 30 };
+    else
+        constexpr int classSize { 20 };
+
+    std::cout << "The class size is: " << classSize << '\n';
+
+    return 0;
+}
+```
+
 ## switch
+
++ 条件变量必须是整型或者enumerated类型
 
 ```c++
 #include <iostream>
@@ -770,6 +808,58 @@ int add(int x, int y) // even though the body of add() isn't defined until here
     return x + y;
 }
 ```
+
+## 内联函数
+
++ 一般用在只有头文件的库
++ 与引入一个头文件类似，内联函数在编译时会将其调用换成实际的函数代码
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    std::cout << ((5 < 6) ? 5 : 6) << '\n';
+    std::cout << ((3 < 2) ? 3 : 2) << '\n';
+    return 0;
+}
+```
+
++ Some types of functions are implicitly treated as inline functions. These include:
+
+  - Functions defined inside a class, struct, or union type definition.
+
+  - Constexpr / consteval functions ([6.14 -- Constexpr and consteval functions](https://www.learncpp.com/cpp-tutorial/constexpr-and-consteval-functions/))
+
+## 常量函数
+
++ 常量函数的返回值会在编译时就计算得出并且替换到调用函数的语句中
++ 常量函数经常在头文件中定义
++ 属于内联函数
+
+```cpp
+#include <iostream>
+
+constexpr int greater(int x, int y) // now a constexpr function
+{
+    return (x > y ? x : y);
+}
+
+int main()
+{
+    constexpr int x{ 5 };
+    constexpr int y{ 6 };
+
+    // We'll explain why we use variable g here later in the lesson
+    constexpr int g { greater(x, y) }; // will be evaluated at compile-time
+
+    std::cout << g << " is greater!\n";
+
+    return 0;
+}
+```
+
+
 
 
 
@@ -1306,6 +1396,7 @@ int getSquareSides()
 + The :: symbol is an operator called the **scope resolution operator**.
 + ::左边是命名空间
 + 使用命名空间缩写：`using namespace std`（不建议使用）
++ 单独使用`::var`代表使用全局变量
 
 ```c++
 #include <iostream>
@@ -1325,7 +1416,7 @@ MyNameSpace::myfunction();
 
 
 
-**嵌套命名空间**
+### 嵌套命名空间
 
 ```c++
 #include <iostream>
@@ -1348,6 +1439,105 @@ int main()
     myfunction();
 }
 ```
+
+C++17可以这样嵌套命名空间：
+
+```cpp
+#include <iostream>
+
+namespace foo::goo // goo is a namespace inside the foo namespace (C++17 style)
+{
+  int add(int x, int y)
+  {
+    return x + y;
+  }
+}
+
+int main()
+{
+    std::cout << foo::goo::add(1, 2) << '\n';
+    return 0;
+}
+```
+
+### 命名空间别名
+
+```cpp
+#include <iostream>
+
+namespace foo::goo
+{
+    int add(int x, int y)
+    {
+        return x + y;
+    }
+}
+
+int main()
+{
+    namespace active = foo::goo; // active now refers to foo::goo
+
+    std::cout << active::add(1, 2) << '\n'; // This is really foo::goo::add()
+
+    return 0;
+} // The active alias ends here
+```
+
+### **using**
+
+1. **using declaration**：
+
+```cpp
+#include <iostream>
+
+int main()
+{
+   using std::cout; // this using declaration tells the compiler that cout should resolve to std::cout
+   cout << "Hello world!\n"; // so no std:: prefix is needed here!
+
+   return 0;
+} // the using declaration expires here
+```
+
+2. **using namespace**
+
+```cpp
+#include <iostream>
+
+int main()
+{
+   using namespace std; // this using directive tells the compiler to import all names from namespace std into the current namespace without qualification
+   cout << "Hello world!\n"; // so no std:: prefix is needed here
+   return 0;
+}
+```
+
+3. 若在块里使用，则只在块里有效。若在全局使用，则全局有效。
+4. ==一旦using被声明，没有办法取消或者替换！！！==
+
+
+
+## 链接linkage
+
++ 链接定义了该函数（变量等）能否从其他文件访问，若能访问则是外部链接，在本文件中所有地方都可访问到是内部链接。
++ 在外部文件使用函数需要在外部文件声明这个函数，因此经常通过引入头文件来声明。
++ 除了外部链接和内部链接，还有的变量没有链接，包括局部块级变量和本地变量。
+
+```cpp
+// Internal global variables definitions:
+static int g_x;          // defines non-initialized internal global variable (zero initialized by default)
+static int g_x{ 1 };     // defines initialized internal global variable
+
+const int g_y { 2 };     // defines initialized internal global const variable
+constexpr int g_y { 3 }; // defines initialized internal global constexpr variable
+
+// Internal function definitions:
+static int foo() {};     // defines internal function
+```
+
+### Variable scope, duration, and linkage summary
+
+![image-20220926194400981](CPP笔记.assets/image-20220926194400981.png)
 
 
 
@@ -1866,6 +2056,13 @@ std::cout << "The second element is: " << mypair.second << '\n';
       
 
 ## 算法工具
+
+### utils
+
+```cpp
+#include <algorithm> // std::max
+#include <cmath> // std::abs
+```
 
 ### std::sort
 
