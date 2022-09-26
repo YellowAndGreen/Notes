@@ -24,9 +24,9 @@ cost = quantity * 2 * storePrice;
 
 a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。如果只是希望增加a 的值，而不需要返回值，则推荐使用++a，其运行速度会略快一些。
 
-**因为先加1再输出的方式省去了将其放入寄存器的时间**
+**因为先加1再输出的方式省去了对a复制一个新的copy，以及之后删除这个临时copy的时间和空间**
 
-
+![image-20220923220015172](CPP笔记.assets/image-20220923220015172.png)
 
 ## main参数
 
@@ -139,6 +139,7 @@ int main()
 
 + 分为运行时常量和编译时常量，运行时常量的值只在运行时才知道，而编译时常量在编译时就知道，因此编译时常量更节省时间。
 + constexpr常量表达式，只能赋予给编译时常量（代替const），否则报错。
++ ==全局常量必须初始化==（在函数之外无法对其赋值）
 
 ```cpp
 #include <iostream>
@@ -165,6 +166,8 @@ int main()
 }
 ```
 
+
+
 ### 字面符
 
 **Literals** are unnamed values inserted directly into the code. 
@@ -183,10 +186,35 @@ std::cout << 3.4;           // 3.4 is a double literal
 
 ### 自动类型推断
 
++ 使用常量赋值会丢掉const
+
 ```c++
 auto c = 'a'
 auto d = 1
 auto& y = c
+const int x { 5 }; // x has type const int
+auto y { x };      // y will be type int (const is dropped)
+```
+
++ 使用auto作为函数类型定义时，return的类型只能有一个。但是缺点是前向定义不会被编译器认可（需要有类型），因此只能在单文件中使用。
+
+```cpp
+auto someFcn(bool b)
+{
+    if (b)
+        return 5; // return type int
+    else
+        return 6.7; // return type double
+}
+```
+
++ 用auto作为类型写在箭头后的标志：
+
+```cpp
+auto add(int x, int y) -> int
+{
+  return (x + y);
+}
 ```
 
 ### implicit转换
@@ -231,19 +259,86 @@ int main()
 
 1. 使用函数`static_cast<type_to_convert_to>(value_to_convert_from)`
 2. 更倾向于使用直接转换
+3. c-style转换（最好不用）：`(double)x`
 
-## 类型修饰符
+### typeid显示类型
 
-The signed (the default if omitted) means the type can hold both positive and negative values, and unsigned means the type has unsigned representation. Other modifiers are for the size:short - type will have the width of at least 16 bits, and long - type will have the width ofat least 32 bits.
-
-```c++
+```cpp
 #include <iostream>
+#include <typeinfo> // for typeid()
+
 int main()
 {
-unsigned long int x = 4294967295;
-std::cout << "The value of an unsigned long integer variable is: " << x;
+    int i{ 2 };
+    double d{ 3.5 };
+    std::cout << typeid(i + d).name() << ' ' << i + d << '\n'; // show us the type of i + d
+
+    return 0;
 }
 ```
+
+## 类型别名
+
+### using
+
++ In C++, **using** is a keyword that creates an alias for an existing data type.
++ 建议使用using而不是typedef
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    using Distance = double; // define Distance as an alias for type double
+
+    Distance milesToDestination{ 3.4 }; // defines a variable of type double
+
+    std::cout << milesToDestination << '\n'; // prints a double value
+
+    return 0;
+}
+```
+
+### typedef
+
+```cpp
+// The following aliases are identical
+typedef long Miles;
+using Miles = long;
+```
+
+## 类型转换
+
+标准转换：C++标准的基本类型之间的转换，包括：
+
+- Numeric promotions 
+- Numeric conversions 
+- Arithmetic conversions
+- Other conversions
+
+### numeric promotion
+
++ A **numeric promotion** is the type conversion of a narrower numeric type (such as a `char`) to a wider numeric type (typically `int` or `double`) that can be processed efficiently and is less likely to have a result that overflows.
+
++ Because such promotions are **safe**, the compiler will freely use numeric promotion as needed, and will not issue a warning when doing so.
+
+### Numeric conversions 
+
++ C++ supports another category of numeric type conversions, called **numeric conversions**, that cover additional type conversions not covered by the numeric promotion rules.
++ In C++, a **narrowing conversion** is a numeric conversion that may result in the loss of data. Such narrowing conversions include:
+  + From a floating point type to an integral type.
+  + From a wider floating point type to a narrower floating point type, unless the value being converted is constexpr and is in range of the destination type (even if the narrower type doesn’t have the precision to store the whole number).
+  + From an integral to a floating point type, unless the value being converted is constexpr and is in range of the destination type and can be converted back into the original type without data loss.
+  + From a wider integral type to a narrower integral type, unless the value being converted is constexpr and after integral promotion will fit into the destination type.
+
+### Arithmetic conversions
+
+The following operators require their operands to be of the same type:
+
+- The binary arithmetic operators: +, -, *, /, %
+- The binary relational operators: <, >, <=, >=, ==, !=
+- The binary bitwise arithmetic operators: &, ^, |
+- The conditional operator ?: (excluding the condition, which is expected to be of type `bool`)
 
 ## utils
 
@@ -641,9 +736,24 @@ int main()
 
 # 流程控制
 
++ 循环变量应该始终是signed（因为unsigned在等于0时再减一等于其上限值）
+
+## 条件操作符
+
+![image-20220923220927776](CPP笔记.assets/image-20220923220927776.png)
+
+```cpp
+larger = (x > y) ? x : y;
+
+std::cout << (x > y) ? x : y << '\n';  // 可能出错
+std::cout << ((x > y) ? x : y) << '\n';  //应该始终用括号包括条件操作符
+```
+
+
+
 ## if
 
-> 逻辑运算符：&&，||，!，^
+> 逻辑运算符：&&，||，!，^(异或操作)
 
 > 条件表达式：`condition ? exp1 : exp2` 若条件符合则exp1，反之
 
@@ -659,7 +769,29 @@ else
 }
 ```
 
+在if else中定义的变量会在判断语句结束后销毁，因此以下代码编译失败。
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    constexpr bool inBigClassroom { false };
+
+    if (inBigClassroom)
+        constexpr int classSize { 30 };
+    else
+        constexpr int classSize { 20 };
+
+    std::cout << "The class size is: " << classSize << '\n';
+
+    return 0;
+}
+```
+
 ## switch
+
++ 条件变量必须是整型或者enumerated类型
 
 ```c++
 #include <iostream>
@@ -684,6 +816,54 @@ int main()
 }
 ```
 
++ 若没有break或者return则匹配后会一直执行
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    switch (2)
+    {
+    case 1: // Does not match
+        std::cout << 1 << '\n'; // Skipped
+    case 2: // Match!
+        std::cout << 2 << '\n'; // Execution begins here
+    case 3:
+        std::cout << 3 << '\n'; // This is also executed
+    case 4:
+        std::cout << 4 << '\n'; // This is also executed
+    default:
+        std::cout << 5 << '\n'; // This is also executed
+    }
+
+    return 0;
+}
+```
+
++ 在switch中声明变量
+
+```cpp
+switch (1)
+{
+    int a; // okay: definition is allowed before the case labels
+    int b{ 5 }; // illegal: initialization is not allowed before the case labels
+
+    case 1:
+        int y; // okay but bad practice: definition is allowed within a case
+        y = 4; // okay: assignment is allowed
+        break;
+
+    case 2:
+        int z{ 4 }; // illegal: initialization is not allowed if subsequent cases exist
+        y = 5; // okay: y was declared above, so we can use it here too
+        break;
+
+    case 3:
+        break;
+}
+```
+
 ## for
 
 ```c++
@@ -692,7 +872,50 @@ int main()
     }
 ```
 
+在循环中使用多个计数变量
 
+```cpp
+#include <iostream>
+
+int main()
+{
+    for (int x{ 0 }, y{ 9 }; x < 10; ++x, --y)
+        std::cout << x << ' ' << y << '\n';
+
+    return 0;
+}
+```
+
+## do... while
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    // selection must be declared outside of the do-while so we can use it later
+    int selection{};
+
+    do
+    {
+        std::cout << "Please make a selection: \n";
+        std::cout << "1) Addition\n";
+        std::cout << "2) Subtraction\n";
+        std::cout << "3) Multiplication\n";
+        std::cout << "4) Division\n";
+        std::cin >> selection;
+    }
+    while (selection != 1 && selection != 2 &&
+        selection != 3 && selection != 4);
+
+    // do something with selection here
+    // such as a switch statement
+
+    std::cout << "You selected option #" << selection << '\n';
+
+    return 0;
+}
+```
 
 # 函数
 
@@ -738,15 +961,42 @@ myfunction(s);
 }
 ```
 
+## 默认参数
+
+1. 只能用等号声明，不能用括号初始化
+
+```cpp
+void foo(int x = 5);   // ok
+void goo(int x ( 5 )); // compile error
+void boo(int x { 5 }); // compile error
+```
+
+2. 默认参数只能放在最右边
+3. 若一个函数有前向声明（在头文件中），最好在声明中定义默认参数
+
 ## 函数重载
 
-参数类型不一样
+> 在编译时实质上将重载的函数变成了不同的名字
+
+1. 参数类型不一样即可，返回类型可以不一样
 
 ```c++
 void myprint(char param);
 void myprint(int param);
 void myprint(double param);
 ```
+
+2. 类型不一样的情况不包括typedefs, type aliases, and const qualifier on value parameters. 包括ellipses.
+
+```cpp
+void print(int);
+void print(const int); // not differentiated from print(int)
+
+void foo(int x, int y);
+void foo(int x, ...); // differentiated from foo(int, int)
+```
+
+
 
 ## 函数声明
 
@@ -771,7 +1021,155 @@ int add(int x, int y) // even though the body of add() isn't defined until here
 }
 ```
 
+## 内联函数
 
++ 一般用在只有头文件的库
++ 与引入一个头文件类似，内联函数在编译时会将其调用换成实际的函数代码
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    std::cout << ((5 < 6) ? 5 : 6) << '\n';
+    std::cout << ((3 < 2) ? 3 : 2) << '\n';
+    return 0;
+}
+```
+
++ Some types of functions are implicitly treated as inline functions. These include:
+
+  - Functions defined inside a class, struct, or union type definition.
+
+  - Constexpr / consteval functions ([6.14 -- Constexpr and consteval functions](https://www.learncpp.com/cpp-tutorial/constexpr-and-consteval-functions/))
+
+## 常量函数
+
++ 常量函数的返回值会在编译时就计算得出并且替换到调用函数的语句中
++ 常量函数经常在头文件中定义
++ 属于内联函数
+
+```cpp
+#include <iostream>
+
+constexpr int greater(int x, int y) // now a constexpr function
+{
+    return (x > y ? x : y);
+}
+
+int main()
+{
+    constexpr int x{ 5 };
+    constexpr int y{ 6 };
+
+    // We'll explain why we use variable g here later in the lesson
+    constexpr int g { greater(x, y) }; // will be evaluated at compile-time
+
+    std::cout << g << " is greater!\n";
+
+    return 0;
+}
+```
+
+## 函数模板
+
+1. 首先需要声明模板类型
+
+2. 使用T, U, V等大写字母作为模板类型名
+3. 通过`max<actual_type>(arg1, arg2)`进行**函数模板实例化**
+4. 相同类型的函数实例化只会进行一次
+5. 通常写在头文件中
+
+```cpp
+#include <iostream>
+
+// a declaration for our function template (we don't need the definition any more)
+template <typename T>
+T max(T x, T y);
+
+template<>
+int max<int>(int x, int y) // the generated function max<int>(int, int)
+{
+    return (x > y) ? x : y;
+}
+
+template<>
+double max<double>(double x, double y) // the generated function max<double>(double, double)
+{
+    return (x > y) ? x : y;
+}
+
+int main()
+{
+    std::cout << max<int>(1, 2) << '\n';    // instantiates and calls function max<int>(int, int)
+    std::cout << max<int>(4, 3) << '\n';    // calls already instantiated function max<int>(int, int)
+    std::cout << max<double>(1, 2) << '\n'; // instantiates and calls function max<double>(double, double)
+
+    return 0;
+}
+```
+
+6. 对于同一个类型的模板参数，其模板实例化时的参数类型必须一致（不加\<type\>时）
+
+```cpp
+#include <iostream>
+
+template <typename T>
+T max(T x, T y)
+{
+    return (x > y) ? x : y;
+}
+
+int main()
+{
+    std::cout << max(2, 3.5) << '\n';  // 编译失败，不是相同类型
+    std::cout << max<double>(2, 3.5) << '\n'; // we've provided actual type double, so the compiler won't use template argument deduction
+
+    return 0;
+}
+```
+
+### 多模板参数
+
+下面代码会出现类型narrow，即返回类型是int，而三目表达式返回的double类型。
+
+**可以通过使用auto返回类型解决**
+
+```cpp
+#include <iostream>
+
+template <typename T, typename U> // We're using two template type parameters named T and U
+T max(T x, U y) // x can resolve to type T, and y can resolve to type U
+{
+    return (x > y) ? x : y; // uh oh, we have a narrowing conversion problem here
+}
+
+int main()
+{
+    std::cout << max(2, 3.5) << '\n';
+
+    return 0;
+}
+```
+
+
+
+```cpp
+#include <iostream>
+
+template <typename T, typename U>
+auto max(T x, U y)
+{
+    return (x > y) ? x : y;
+}
+
+int main()
+{
+    std::cout << max(2, 3.5) << '\n';
+
+    return 0;
+}
+```
 
 # 面向对象
 
@@ -1306,6 +1704,7 @@ int getSquareSides()
 + The :: symbol is an operator called the **scope resolution operator**.
 + ::左边是命名空间
 + 使用命名空间缩写：`using namespace std`（不建议使用）
++ 单独使用`::var`代表使用全局变量
 
 ```c++
 #include <iostream>
@@ -1325,7 +1724,7 @@ MyNameSpace::myfunction();
 
 
 
-**嵌套命名空间**
+### 嵌套命名空间
 
 ```c++
 #include <iostream>
@@ -1348,6 +1747,105 @@ int main()
     myfunction();
 }
 ```
+
+C++17可以这样嵌套命名空间：
+
+```cpp
+#include <iostream>
+
+namespace foo::goo // goo is a namespace inside the foo namespace (C++17 style)
+{
+  int add(int x, int y)
+  {
+    return x + y;
+  }
+}
+
+int main()
+{
+    std::cout << foo::goo::add(1, 2) << '\n';
+    return 0;
+}
+```
+
+### 命名空间别名
+
+```cpp
+#include <iostream>
+
+namespace foo::goo
+{
+    int add(int x, int y)
+    {
+        return x + y;
+    }
+}
+
+int main()
+{
+    namespace active = foo::goo; // active now refers to foo::goo
+
+    std::cout << active::add(1, 2) << '\n'; // This is really foo::goo::add()
+
+    return 0;
+} // The active alias ends here
+```
+
+### **using**
+
+1. **using declaration**：
+
+```cpp
+#include <iostream>
+
+int main()
+{
+   using std::cout; // this using declaration tells the compiler that cout should resolve to std::cout
+   cout << "Hello world!\n"; // so no std:: prefix is needed here!
+
+   return 0;
+} // the using declaration expires here
+```
+
+2. **using namespace**
+
+```cpp
+#include <iostream>
+
+int main()
+{
+   using namespace std; // this using directive tells the compiler to import all names from namespace std into the current namespace without qualification
+   cout << "Hello world!\n"; // so no std:: prefix is needed here
+   return 0;
+}
+```
+
+3. 若在块里使用，则只在块里有效。若在全局使用，则全局有效。
+4. ==一旦using被声明，没有办法取消或者替换！！！==
+
+
+
+## 链接linkage
+
++ 链接定义了该函数（变量等）能否从其他文件访问，若能访问则是外部链接，在本文件中所有地方都可访问到是内部链接。
++ 在外部文件使用函数需要在外部文件声明这个函数，因此经常通过引入头文件来声明。
++ 除了外部链接和内部链接，还有的变量没有链接，包括局部块级变量和本地变量。
+
+```cpp
+// Internal global variables definitions:
+static int g_x;          // defines non-initialized internal global variable (zero initialized by default)
+static int g_x{ 1 };     // defines initialized internal global variable
+
+const int g_y { 2 };     // defines initialized internal global const variable
+constexpr int g_y { 3 }; // defines initialized internal global constexpr variable
+
+// Internal function definitions:
+static int foo() {};     // defines internal function
+```
+
+### Variable scope, duration, and linkage summary
+
+![image-20220926194400981](CPP笔记.assets/image-20220926194400981.png)
 
 
 
@@ -1419,7 +1917,16 @@ int main()
 }
 ```
 
+### std::cind的原理
 
+When the user enters input in response to an extraction operation, that data is placed in a buffer inside of std::cin. A **buffer** (also called a data buffer) is simply a piece of memory set aside for storing data temporarily while it’s moved from one place to another. In this case, the buffer is used to hold user input while it’s waiting to be extracted to variables.
+
+When the extraction operator is used, the following procedure happens:
+
+- If there is data already in the input buffer, that data is used for extraction.
+- If the input buffer contains no data, the user is asked to input data for extraction (this is the case most of the time). When the user hits enter, a ‘\n’ character will be placed in the input buffer.
+- operator>> extracts as much data from the input buffer as it can into the variable (ignoring any leading whitespace characters, such as spaces, tabs, or ‘\n’).
+- Any data that can not be extracted is left in the input buffer for the next extraction.
 
 ## 文件流
 
@@ -1582,6 +2089,99 @@ int main(int argc, const char *argv[])
 
 
 # 标准库
+
+## 常用
+
+### 程序退出
+
+#### std::exit
+
++ 使程序立即正常退出
++ The `std::exit()` function does not clean up local variables in the current function or up the call stack.
+
+```cpp
+#include <cstdlib> // for std::exit()
+#include <iostream>
+
+void cleanup()
+{
+    // code here to do any kind of cleanup required
+    std::cout << "cleanup!\n";
+}
+
+int main()
+{
+    std::cout << 1 << '\n';
+    cleanup();
+
+    std::exit(0); // terminate and return status code 0 to operating system
+
+    // The following statements never execute
+    std::cout << 2 << '\n';
+
+    return 0;
+}
+```
+
+#### **std::atexit**
+
++ 退出时可以指定一个清理函数来销毁变量等
+
+```cpp
+#include <cstdlib> // for std::exit()
+#include <iostream>
+
+void cleanup()
+{
+    // code here to do any kind of cleanup required
+    std::cout << "cleanup!\n";
+}
+
+int main()
+{
+    // register cleanup() to be called automatically when std::exit() is called
+    std::atexit(cleanup); // note: we use cleanup rather than cleanup() since we're not making a function call to cleanup() right now
+
+    std::cout << 1 << '\n';
+
+    std::exit(0); // terminate and return status code 0 to operating system
+
+    // The following statements never execute
+    std::cout << 2 << '\n';
+
+    return 0;
+}
+```
+
+#### std::abort
+
+异常退出
+
+```cpp
+#include <cstdlib> // for std::abort()
+#include <iostream>
+
+int main()
+{
+    std::cout << 1 << '\n';
+    std::abort();
+
+    // The following statements never execute
+    std::cout << 2 << '\n';
+
+    return 0;
+}
+```
+
+
+
+#### std::terminate
+
+通常和exceptions结合使用，默认调用std::abort()
+
+
+
+
 
 ## 容器
 
@@ -1866,6 +2466,13 @@ std::cout << "The second element is: " << mypair.second << '\n';
       
 
 ## 算法工具
+
+### utils
+
+```cpp
+#include <algorithm> // std::max
+#include <cmath> // std::abs
+```
 
 ### std::sort
 
@@ -2155,3 +2762,63 @@ target_link_libraries($(CMAKE_PROJECT_NAME) hello_shared)
 add_dependencies(listener beginner_tutorials_generate_messages_cpp)
 ```
 
+
+
+# 错误处理
+
+## assertion
+
++ 是预处理宏
++ 可通过&&来输出额外的信息，如下所示
++ 在宏定义NDEBUG时不会生效
+
+```cpp
+#include <cassert> // for assert()
+#include <cmath> // for std::sqrt
+#include <iostream>
+
+double calculateTimeUntilObjectHitsGround(double initialHeight, double gravity)
+{
+  assert(gravity > 0.0); // The object won't reach the ground unless there is positive gravity.
+  assert(（gravity > 0.0） && "Car could not be found in database");
+  if (initialHeight <= 0.0)
+  {
+    // The object is already on the ground. Or buried.
+    return 0.0;
+  }
+
+  return std::sqrt((2.0 * initialHeight) / gravity);
+}
+
+int main()
+{
+  std::cout << "Took " << calculateTimeUntilObjectHitsGround(100.0, -9.8) << " second(s)\n";
+
+  return 0;
+}
+```
+
+## static_assert
+
++ 在编译时运行检查
++ 条件必须在编译时能够evaluate
+
+```cpp
+static_assert(sizeof(long) == 8, "long must be 8 bytes");
+static_assert(sizeof(int) == 4, "int must be 4 bytes");
+
+int main()
+{
+	return 0;
+}
+```
+
+
+
+# 测试
+
+代码覆盖率：在测试时有多少代码被执行
+
+**statement coverage**：the percentage of statements in your code that have been exercised by your testing routines.
+
+**Branch coverage**：the percentage of branches that have been executed, each possible branch counted separately.（例如if语句的true和false）
