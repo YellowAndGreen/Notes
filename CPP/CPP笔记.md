@@ -186,7 +186,10 @@ std::cout << 3.4;           // 3.4 is a double literal
 
 ### 自动类型推断
 
-+ 使用常量赋值会丢掉const
++ 使用常量赋值会丢掉topconst
++ 使用const auto来将推断的类型作为常量
++ 同const一样，引用赋值会丢掉引用，在前面加上&即可
++ 指针不会丢掉
 
 ```c++
 auto c = 'a'
@@ -194,6 +197,13 @@ auto d = 1
 auto& y = c
 const int x { 5 }; // x has type const int
 auto y { x };      // y will be type int (const is dropped)
+const auto y { x };
+
+auto ref1 { getRef() };  // std::string (reference dropped)
+auto& ref2 { getRef() }; // std::string& (reference reapplied)
+
+auto ptr1{ getPtr() }; // std::string*
+auto* ptr1{ getPtr() }; // 带星号和上面的相同
 ```
 
 + 使用auto作为函数类型定义时，return的类型只能有一个。但是缺点是前向定义不会被编译器认可（需要有类型），因此只能在单文件中使用。
@@ -272,6 +282,28 @@ int main()
     int i{ 2 };
     double d{ 3.5 };
     std::cout << typeid(i + d).name() << ' ' << i + d << '\n'; // show us the type of i + d
+
+    return 0;
+}
+```
+
+## 复合类型
+
+### Lvalue and rvalue
+
+1. lvalues expressions are those that evaluate to variables or other identifiable objects that persist beyond the end of the expression.
+2. rvalues expressions are those that evaluate to literals or the returned value of functions and operators that are discarded at the end of the expression.
+
++ rvalue可理解为临时变量
+
+```cpp
+int main()
+{
+    int x{};
+
+    // Assignment requires the left operand to be a modifiable lvalue expression and the right operand to be an rvalue expression
+    x = 5; // valid: x is a modifiable lvalue expression and 5 is an rvalue expression
+    5 = x; // error: 5 is an rvalue expression and x is a modifiable lvalue expression
 
     return 0;
 }
@@ -504,9 +536,14 @@ atol("21")
 
 > 指针类型<type>\*，例如int* p
 >
+> 引用类型<type>&, 例如int& p
+>
 > 使用&获取一个变量的指针
 >
 > 使用\*获取一个指针指向的变量
+
++ 若一个变量名为x，则命名其指针为xptr
++ 指针的大小：The size of a pointer is dependent upon the architecture the executable is compiled for -- a 32-bit executable uses 32-bit memory addresses -- consequently, a pointer on a 32-bit machine is 32 bits (4 bytes). With a 64-bit executable, a pointer would be 64 bits (8 bytes).
 
 ```c++
 int x = 123;
@@ -517,7 +554,11 @@ std::cout << *p;
 *p = 456
     
 // 初始化空指针
-char* p = nullptr
+int* ptr1, ptr2;   // incorrect: ptr1 is a pointer to an int, but ptr2 is just a plain int!
+int* ptr3, * ptr4; // correct: ptr3 and p4 are both pointers to an int
+char* p{nullptr};
+char* p{};  // 和上面效果一样
+char* p{&x};
     
 int x;
 int * p1 = &x; // 指针可以被修改，值也可以被修改
@@ -528,7 +569,62 @@ const int * const p4 = &x; // 指针不可以被修改，值也不可以被修�
 // 使用逗号在一行赋值的时候，第一个以后的指针要加上*号
 ListNode* slow = head , *fast = head;
 
-// ListNode *head和ListNode* head没有区别，均表示指针 
+// 指针可以转换为布尔值，空指针为0
+if (ptr) // implicit conversion to Boolean
+    std::cout << "ptr is non-null\n";
+else
+    std::cout << "ptr is null\n";
+```
+
+### 常数指针
+
+#### 指向常数的指针(low-level)
+
++ 其指向的object值不能修改
++ 这个指针能修改（指向其他object）
++ 能够指向非常数，但是还是不能改变值
+
+```cpp
+int main()
+{
+    const int x{ 5 };
+    const int* ptr { &x }; // ptr points to const int x
+
+    const int y{ 6 };
+    ptr = &y; // okay: ptr now points at const int y
+
+    return 0;
+}
+```
+
+#### 自身是常数的指针(high-level)
+
++ 指针的地址之后不能被修改
++ 同常数一样，必须在一开始初始化
+
+```cpp
+int main()
+{
+    int x{ 5 };
+    int y{ 6 };
+
+    int* const ptr { &x }; // okay: the const pointer is initialized to the address of x
+    ptr = &y; // error: once initialized, a const pointer can not be changed.
+
+    return 0;
+}
+```
+
+#### 指向常数的常数指针(both)
+
+```cpp
+int main()
+{
+    int value { 5 };
+    const int* const ptr { &value }; // a const pointer to a const value
+
+    return 0;
+}
 ```
 
 ### 聪明指针
@@ -609,11 +705,46 @@ std::shared_ptr<int> p3 = p1;
 }
 ```
 
+### 修改函数参数中的指针
+
++ 函数参数中的指针是地址的一个copy，不能够修改到实际的指针变量
++ 因此需要传递引用`int*& refptr`
+
+```cpp
+#include <iostream>
+
+void nullify(int*& refptr) // refptr is now a reference to a pointer
+{
+    refptr = nullptr; // Make the function parameter a null pointer
+}
+
+int main()
+{
+    int x{ 5 };
+    int* ptr{ &x }; // ptr points to x
+
+    std::cout << "ptr is " << (ptr ? "non-null\n" : "null\n");
+
+    nullify(ptr);
+
+    std::cout << "ptr is " << (ptr ? "non-null\n" : "null\n");
+    return 0;
+}
+```
 
 
-## 引用
 
-> <type>\&表示引用类型
+
+
+## lvalue引用
+
+> <type>\&表示引用类型，一般紧跟在类型之后，但放在变量名之前也可
+
++ 所有的引用都必须初始化
++ 引用类型必须和被引用的类型一致
++ 引用类型不能重新指向其他lvalue
++ 引用常量必须在类型前加上const  `const int& ref { x };`
++ 常量引用可以通过rvalue初始化  `const int& ref { 5 }; // okay: 5 is an rvalue`
 
 ```c++
 int x = 123;
@@ -621,7 +752,13 @@ int& p1 = x;
 int p2 = x;
 // 引用和原变量的指针相同，直接赋值指针不同
 std::cout << &x <<"\n" << &p1 << "\n" << &p2;
+
+const int y { 5 };
+int& invalidRef { y };  // invalid: can't bind to a non-modifiable lvalue
+int& invalidRef2 { 0 }; // invalid: can't bind to an r-value
 ```
+
++ 使用常量引用 非常量lvalue时，起常量引用不能修改值
 
 ## 生命周期
 
@@ -961,6 +1098,31 @@ myfunction(s);
 }
 ```
 
+2. 非常量引用的参数只能是非常量的lvalue
+
+```cpp
+#include <iostream>
+#include <string>
+
+void printValue(int& y) // y only accepts modifiable lvalues
+{
+    std::cout << y << '\n';
+}
+
+int main()
+{
+    int x { 5 };
+    printValue(x); // ok: x is a modifiable lvalue
+
+    const int z { 5 };
+    printValue(z); // error: z is a non-modifiable lvalue
+
+    printValue(5); // error: 5 is an rvalue
+
+    return 0;
+}
+```
+
 ## 默认参数
 
 1. 只能用等号声明，不能用括号初始化
@@ -1071,6 +1233,55 @@ int main()
 }
 ```
 
+## 通过指针或引用返回
+
++ 被引用的object必须在函数在外时是有效的（其scope不能仅限于函数内），否则会出错
++ 只要指针指向的object在scope下live，则可以返回指针
++ 返回指针可以返回`nullptr`
+
+```cpp
+#include <iostream>
+#include <string>
+
+const std::string& getProgramName()
+{
+    const std::string programName { "Calculator" }; // now a local variable, destroyed when function ends
+
+    return programName;
+}
+
+int main()
+{
+    std::cout << "This program is named " << getProgramName();
+
+    return 0;
+}
+```
+
++ Avoid returning references to non-const local static variables.
+
+```cpp
+#include <iostream>
+#include <string>
+
+const int& getNextId()
+{
+    static int s_x{ 0 }; // note: variable is non-const
+    ++s_x; // generate the next id
+    return s_x; // and return a reference to it
+}
+
+int main()
+{
+    const int& id1 { getNextId() }; // id1 is a reference
+    const int& id2 { getNextId() }; // id2 is a reference
+
+    std::cout << id1 << id2 << '\n';
+
+    return 0;
+}
+```
+
 ## 函数模板
 
 1. 首先需要声明模板类型
@@ -1134,16 +1345,6 @@ int main()
 下面代码会出现类型narrow，即返回类型是int，而三目表达式返回的double类型。
 
 **可以通过使用auto返回类型解决**
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-=======
-
-
->>>>>>> main
->>>>>>> main
->>>>>>> main
 
 ```cpp
 #include <iostream>
