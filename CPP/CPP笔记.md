@@ -1134,6 +1134,16 @@ int main()
 下面代码会出现类型narrow，即返回类型是int，而三目表达式返回的double类型。
 
 **可以通过使用auto返回类型解决**
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+=======
+
+
+>>>>>>> main
+>>>>>>> main
+>>>>>>> main
 
 ```cpp
 #include <iostream>
