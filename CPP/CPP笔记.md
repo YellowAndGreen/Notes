@@ -287,28 +287,6 @@ int main()
 }
 ```
 
-## 复合类型
-
-### Lvalue and rvalue
-
-1. lvalues expressions are those that evaluate to variables or other identifiable objects that persist beyond the end of the expression.
-2. rvalues expressions are those that evaluate to literals or the returned value of functions and operators that are discarded at the end of the expression.
-
-+ rvalue可理解为临时变量
-
-```cpp
-int main()
-{
-    int x{};
-
-    // Assignment requires the left operand to be a modifiable lvalue expression and the right operand to be an rvalue expression
-    x = 5; // valid: x is a modifiable lvalue expression and 5 is an rvalue expression
-    5 = x; // error: 5 is an rvalue expression and x is a modifiable lvalue expression
-
-    return 0;
-}
-```
-
 ## 类型别名
 
 ### using
@@ -394,7 +372,11 @@ for(size_t i=0;i<10;i++){...}
 
 ## 数组
 
+1. 基本
+
 ```c++
+#include <iterator> // for std::size
+
 // 初始化并赋值
 int arr[5] = {1,2,3,4};
 std::cout << arr[1];
@@ -402,6 +384,63 @@ std::cout << arr[1];
 // 获取一个数组的长度
 int a[5] ={1,2,3,4,5};
 std::cout << sizeof a/sizeof a[0];
+// c++17的长度获取方式
+int array[]{ 1, 1, 2, 3, 5, 8, 13, 21 };
+std::cout << "The array has: " << std::size(array) << " elements\n";
+```
+
+2. 函数传递的数组实际上是数组第一个元素的指针，因此在函数中修改和遍历数组有影响，且函数中不能使用`std::size(array)`
+
+   **但在结构体或class中的数组不会自动转换(decay)！！！**
+
+> 在函数参数中，`int array[]`会自动转换为`int* array`，为了更易懂，最好在参数中直接写后者
+
+```cpp
+void passArray(int prime[5]) // prime is the actual array
+// void passArray(const int prime[5]) 加上const解决
+{
+    prime[0] = 11; // so changing it here will change the original argument!
+    prime[1] = 7;
+    prime[2] = 5;
+    prime[3] = 3;
+    prime[4] = 2;
+}
+```
+
+3. 多维数组
+
+```cpp
+int array[3][5]
+{
+  { 1, 2 }, // row 0 = 1, 2, 0, 0, 0
+  { 6, 7, 8 }, // row 1 = 6, 7, 8, 0, 0
+  { 11, 12, 13, 14 } // row 2 = 11, 12, 13, 14, 0
+};
+```
+
+4. 动态分配数组的大小，删除数组时需要用`delete[]`
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    std::cout << "Enter a positive integer: ";
+    int length{};
+    std::cin >> length;
+
+    int* array{ new int[length]{} }; // use array new.  Note that length does not need to be constant!
+
+    std::cout << "I just allocated an array of integers of length " << length << '\n';
+
+    array[0] = 5; // set element 0 to value 5
+
+    delete[] array; // use array delete to deallocate array
+
+    // we don't need to set array to nullptr/0 here because it's going out of scope immediately after this anyway
+
+    return 0;
+}
 ```
 
 ## 字符串
@@ -732,6 +771,46 @@ int main()
 }
 ```
 
+### 指针算术
+
+1. 指针+1等于其指向的地址加上其类型所占据的空间
+
+```cpp
+#include <iostream>
+
+int main()
+{
+    int value{ 7 };
+    int* ptr{ &value };
+
+    std::cout << ptr << '\n';
+    std::cout << ptr+1 << '\n';
+    std::cout << ptr+2 << '\n';
+    std::cout << ptr+3 << '\n';
+
+    return 0;
+}
+#0012FF7C
+0012FF80
+0012FF84
+0012FF88
+```
+
+### void指针
+
+1. 能够指向任何类型的指针，但不能直接dereference，需要先转换成对应类型
+
+```cpp
+int value{ 5 };
+void* voidPtr{ &value };
+
+// std::cout << *voidPtr << '\n'; // illegal: dereference of void pointer
+
+int* intPtr{ static_cast<int*>(voidPtr) }; // however, if we cast our void pointer to an int pointer...
+
+std::cout << *intPtr << '\n'; // then we can dereference the result
+```
+
 
 
 
@@ -762,6 +841,8 @@ int& invalidRef2 { 0 }; // invalid: can't bind to an r-value
 
 ## 生命周期
 
+> Normal variables are allocated from limited memory called the **stack**. Dynamically allocated variables are allocated from a general pool of memory called the **heap**.
+
 1. 自动存储期间
 
 所有local变量均以栈存储
@@ -776,14 +857,24 @@ int& invalidRef2 { 0 }; // invalid: can't bind to an r-value
 
 ### new和delete
 
+1. new会从操作系统索取内存，delete将内存返还给操作系统，而非删除
+
+2. 删除指针后最好将其设为`nullptr`
+3. 使用`new`时避免多个指针指向同一个`Object`，因为删除时所有指针均需要改为`nullptr`
+4. 使用new获取内存时可能会失败（例如当内存不足时），用`int* value { new (std::nothrow) int }`当失败时赋予空指针
+
 ```c++
 #include <iostream>
 int main()
 {
 int* p = new int;
+int* ptr1{ new int (5) }; // use direct initialization
+int* ptr2{ new int { 6 } }; // use uniform initialization
+    
 *p = 123;
 std::cout << "The pointed-to value is: " << *p;
 delete p;
+    
 }
 
 // 对于数组变量
@@ -798,6 +889,26 @@ std::cout << "The values are: " << p[0] << ' ' << p[1] << ' ' << p[2];
 delete[] p;
 }
 ```
+
+5. 删除空指针没有影响，因此不需要判断是否为空指针：`delete ptr;`
+6. 在给指针变量重新指定内存地址时，先`delete`以免内存泄漏
+
+### 内存泄漏
+
+> 一个变量的生命周期结束了但是没有将内存返还给操作系统
+
+Consider the following function:
+
+```cpp
+void doSomething()
+{
+    int* ptr{ new int{} };
+}
+```
+
+This function allocates an integer dynamically, but never frees it using delete. Because pointers variables are just normal variables, when the function ends, ptr will go out of scope. And because ptr is the only variable holding the address of the dynamically allocated integer, when ptr is destroyed there are no more references to the dynamically allocated memory. This means the program has now “lost” the address of the dynamically allocated memory. As a result, this dynamically allocated integer can not be deleted.
+
+This is called a **memory leak**. Memory leaks happen when your program loses the address of some bit of dynamically allocated memory before giving it back to the operating system. When this happens, your program can’t delete the dynamically allocated memory, because it no longer knows where it is. The operating system also can’t use this memory, because that memory is considered to be still in use by your program.
 
 ### 临时变量
 
@@ -871,6 +982,245 @@ int main()
 
 
 
+# 复合类型
+
+## Lvalue and rvalue
+
+1. lvalues expressions are those that evaluate to variables or other identifiable objects that persist beyond the end of the expression.
+2. rvalues expressions are those that evaluate to literals or the returned value of functions and operators that are discarded at the end of the expression.
+
++ rvalue可理解为临时变量
+
+```cpp
+int main()
+{
+    int x{};
+
+    // Assignment requires the left operand to be a modifiable lvalue expression and the right operand to be an rvalue expression
+    x = 5; // valid: x is a modifiable lvalue expression and 5 is an rvalue expression
+    5 = x; // error: 5 is an rvalue expression and x is a modifiable lvalue expression
+
+    return 0;
+}
+```
+
+## 类型定义
+
++ 使用程序定义的类型时，该文件中必须有该文件的完整定义
++ 因此一般在头文件中直接写好类型的完整定义，然后传入需要使用的文件（这里允许有多个定义）
+
+## 枚举Enum
+
+1. 是program-defined types，必须先定义
+
+### unscoped
+
+1. unscoped enumeration使用`enum`关键字定义
+2. 可以通过其所在的scope获取enum变量，也可以通过命名空间获取：`Color::red`
+
+```cpp
+// Define a new unscoped enumeration named Color
+enum Color
+{
+    // Here are the enumerators
+    // These symbolic constants define all the possible values this type can hold
+    // Each enumerator is separated by a comma, not a semicolon
+    red,
+    green,
+    blue, // trailing comma optional but recommended
+    max_num,  // 经常在最后加上以便获取整个枚举的数量
+}; // the enum definition must end with a semicolon
+
+int main()
+{
+    // Define a few variables of enumerated type Color
+    Color apple { red };   // my apple is red
+    Color shirt { green }; // my shirt is green
+    Color cup { blue };    // my cup is blue
+
+    Color socks { white }; // error: white is not an enumerator of Color
+    Color hat { 2 };       // error: 2 is not an enumerator of Color
+
+    return 0;
+}
+```
+
+3. 在相同scope下的 enumerator name不能重复
+4. 由于枚举会污染命名空间，一般将其放入namespace或者class中
+
+```cpp
+enum Color
+{
+    red,
+    green,
+    blue, // blue is put into the global namespace
+};
+
+enum Feeling
+{
+    happy,
+    tired,
+    blue, // error: naming collision with the above blue
+};
+
+int main()
+{
+    Color apple { red }; // my apple is red
+    Feeling me { happy }; // I'm happy right now (even though my program doesn't compile)
+
+    return 0;
+}
+```
+
+5. 枚举实际以整型存储，会隐式转换为整型值，整型值不会隐式转换为枚举
+6. 一半的存储类型时标准int，但可以指定类型
+
+```cpp
+// Use an 8-bit unsigned integer as the enum base
+enum Color : std::uint8_t
+{
+    black,
+    red,
+    blue,
+};
+```
+
+### scoped
+
++ 也叫枚举类(enum class)
+
++ strongly typed (they won’t implicitly convert to integers) 
++ strongly scoped (the enumerators are only placed into the scope region of the enumeration). 自带命名空间，以`Color::red`使用
++ 使用关键字`enum class`，用法和`enum`相同
+
+```cpp
+#include <iostream>
+int main()
+{
+    enum class Color
+    {
+        red,
+        blue,
+    };
+
+    Color color { Color::blue };
+
+    std::cout << color << '\n'; // won't work, because there's no implicit conversion to int
+    std::cout << static_cast<int>(color) << '\n'; // will print 1
+
+    return 0;
+}
+```
+
+## 结构体
+
+1. 聚合数据类型及其初始化
+
+>  结构体只有data member是聚合数据类型，array，class等也是聚合数据类型
+>
+> 结构体初始化是逐个成员进行的(memberwise)
+
+```cpp
+struct Employee
+{
+    int id;  // 无初始值，bad
+    int age {2};
+    double wage {};  // 有默认值
+};
+
+int main()
+{
+    Employee foo = {}  // 第一个id有值初始化
+    Employee foo1 = {}  // 第一个id有值初始化，但更安全，会保证一定初始化
+    Employee frank = { 1, 32, 60000.0 }; // copy-list initialization using braced list
+    Employee robert ( 3, 45, 62500.0 );  // direct initialization using parenthesized list (C++20)
+    Employee joe { 2, 28, 45000.0 };     // list initialization using braced list (preferred)
+    // 可以使用常量
+	const Employee frank;  
+    // 修改值
+    frank.id = 4;
+    // 以brace修改值
+    frank = { 1, 34, 60000.0 };
+    // 使用箭头符号获取指针指向对象的值
+    Employee* ptr_frank{&frank};
+    ptr_frank->id=4;
+    return 0;
+}
+```
+
+2. 返回结构体
+
+```cpp
+Point3d getZeroPoint()
+{
+    // We already specified the type at the function declaration
+    // so we don't need to do so here again
+    return { 0.0, 0.0, 0.0 }; // return an unnamed Point3d
+    return { }; // 使用值初始化
+}
+```
+
+
+
+
+
+## 类型模板
+
+1. 因为`struct Pair`的使用很广泛，所以有`<utility>`中的`std::pair`来简化
+2. `std::pair`中实际上也是first和second
+
+```cpp
+#include <iostream>
+
+template <typename T, typename U>
+struct Pair
+{
+    T first{};
+    U second{};
+};
+
+template <typename T, typename U>
+void print(Pair<T, U> p)
+{
+    std::cout << '[' << p.first << ", " << p.second << ']';
+}
+
+int main()
+{
+    Pair<int, double> p1{ 1, 2.3 }; // a pair holding an int and a double
+    Pair<double, int> p2{ 4.5, 6 }; // a pair holding a double and an int
+    Pair<int, int> p3{ 7, 8 };      // a pair holding two ints
+
+    print(p2);
+
+    return 0;
+}
+```
+
+
+
+```cpp
+#include <iostream>
+#include <utility>
+
+template <typename T, typename U>
+void print(std::pair<T, U> p)
+{
+    std::cout << '[' << p.first << ", " << p.second << ']';
+}
+
+int main()
+{
+    std::pair<int, double> p1{ 1, 2.3 }; // a pair holding an int and a double
+    std::pair<double, int> p2{ 4.5, 6 }; // a pair holding a double and an int
+    std::pair<int, int> p3{ 7, 8 };      // a pair holding two ints
+
+    print(p2);
+
+    return 0;
+}
+```
+
 # 流程控制
 
 + 循环变量应该始终是signed（因为unsigned在等于0时再减一等于其上限值）
@@ -931,26 +1281,24 @@ int main()
 + 条件变量必须是整型或者enumerated类型
 
 ```c++
-#include <iostream>
-int main()
-{
-    int x = 3;
-    switch (x)
+    switch (animal)
     {
-        case 1:
-            std::cout << "The value of x is 1.";
+        case Animal::chicken:
+        case Animal::duck:
+            std::cout << 2;
             break;
-        case 2:
-            std::cout << "The value of x is 2.";
+
+        case Animal::pig:
+        case Animal::goat:
+        case Animal::cat:
+        case Animal::dog:
+            std::cout << 4;
             break;
-        case 3:
-            std::cout << "The value of x is 3."; 
-            break;
+
         default:
-            std::cout << "The value is none of the above.";
+            std::cout << "???";
             break;
     }
-}
 ```
 
 + 若没有break或者return则匹配后会一直执行
@@ -1022,6 +1370,32 @@ int main()
     return 0;
 }
 ```
+
+## foreach循环
+
+1. 可以循环迭代 container/range的内容：`for (some_type element_name : container_name)`
+
+2. ==element_name 实际上是元素的复制，若想使用实际元素，可以用引用类型==：
+
+   ```c++
+   #include <iostream>
+   #include <vector>
+   int main()
+   {
+       std::vector<int> v = { 1, 2, 3, 4, 5 };
+       v.push_back(10);
+       for (int& el : v)
+       {
+           el = 2;
+       }
+       for (int el : v)
+       {
+           std::cout << el;
+       }
+   }
+   ```
+
+   
 
 ## do... while
 
@@ -1206,6 +1580,31 @@ int main()
   - Constexpr / consteval functions ([6.14 -- Constexpr and consteval functions](https://www.learncpp.com/cpp-tutorial/constexpr-and-consteval-functions/))
 
 ## 常量函数
+
++ consteval的函数必须在编译时evaluate(c++20)
++ consteval函数只在返回值是constexpr时起作用
+
+```cpp
+#include <iostream>
+
+constexpr int greater(int x, int y)
+{
+    return (x > y ? x : y);
+}
+
+int main()
+{
+    constexpr int g { greater(5, 6) };            // case 1: evaluated at compile-time
+    std::cout << g << " is greater!\n";
+
+    int x{ 5 }; // not constexpr
+    std::cout << greater(x, 6) << " is greater!\n"; // case 2: evaluated at runtime
+
+    std::cout << greater(5, 6) << " is greater!\n"; // case 3: may be evaluated at either runtime or compile-time
+
+    return 0;
+}
+```
 
 + 常量函数的返回值会在编译时就计算得出并且替换到调用函数的语句中
 + 常量函数经常在头文件中定义
@@ -2402,9 +2801,13 @@ int main()
 
 ### std::vector
 
-1. vector的长度会随着删除和插入自动变化
+> 对标于动态数组，不需要在初始化时指定数组长度，vector的长度会随着删除和插入自动变化
+>
+> 一旦out of scope，会自动归还内存，不会有内存泄漏问题
 
 ![image-20220507092106079](img/image-20220507092106079.png)
+
++ `resize(len)`: 修改数组的长度
 
 ```c++
 #include <vector>
@@ -2413,8 +2816,10 @@ int main()
 int main()
 {
     std::vector<int> v = { 1, 2, 3, 4, 5 };
-    // 初始化四个相同的值（0）
-    std::vector<int> color(4, 0);
+    // 初始化四个相同的值（1）
+    std::vector<int> color(4, 1);
+    // 初始化到默认值(0)
+    std::vector<int> color2(4);
     // 二维数组初始化
     std::vector<std::vector<int>> graph(10,std::vector<int>());
     // 入栈操作
@@ -2426,9 +2831,17 @@ int main()
 }
 ```
 
-### std::array
+### std::array, std::to_array
 
 > The std::array is a thin wrapper around a C-style array.
+>
+> `std::array` provides fixed array functionality that won’t decay when passed into a function.
+>
+> To create an array with a specific type and deduced size, we use the `std::to_array` function
+>
+> Unfortunately, `std::to_array` is more expensive than creating a `std::array` directly, because it actually copies all elements from a C-style array to a `std::array`. For this reason, `std::to_array` should be avoided when the array is created many times (e.g. in a loop).
+
+1. 基本使用
 
 ```c++
 #include <iostream>
@@ -2440,6 +2853,71 @@ int main()
     {
         std::cout << el << '\n';
     }
+    auto myArray1 { std::to_array<int, 5>({ 9, 7, 5, 3, 1 }) }; // Specify type and size
+    auto myArray2 { std::to_array<int>({ 9, 7, 5, 3, 1 }) }; // Specify type only, deduce size
+    auto myArray3 { std::to_array({ 9, 7, 5, 3, 1 }) }; // Deduce type and size
+}
+```
+
+2. 可使用`array.at(index)`取值，虽然比`[]`取值慢，但会提前进行边界检查，因此更安全
+
+3. 使用`array.size()`获取数组大小
+
+4. 手动使用index遍历数组需要使用`size_t`，因为array.size()返回的时`unsignal`整型
+
+   **std::array::size_type is just an alias for std::size_t**
+
+```cpp
+#include <array>
+#include <iostream>
+
+int main()
+{
+    std::array myArray { 7, 3, 1, 9, 5 };
+
+    // std::array<int, 5>::size_type is the return type of size()!
+    for (std::array<int, 5>::size_type i{ 0 }; i < myArray.size(); ++i)
+        std::cout << myArray[i] << ' ';
+
+    std::cout << '\n';
+
+    return 0;
+}
+```
+
+5. 结构体数组的初始化需要多一个括号：
+
+```cpp
+#include <array>
+#include <iostream>
+
+struct House
+{
+    int number{};
+    int stories{};
+    int roomsPerStory{};
+};
+
+int main()
+{
+    std::array<House, 3> houses{};
+
+    std::array<House, 3> houses { // initializer for houses
+        { // extra set of braces to initialize the C-style array member inside the std::array struct
+            { 13, 4, 30 }, // initializer for array element 0
+            { 14, 3, 10 }, // initializer for array element 1
+            { 15, 3, 40 }, // initializer for array element 2
+         }
+    };
+
+    for (const auto& house : houses)
+    {
+        std::cout << "House number " << house.number
+                  << " has " << (house.stories * house.roomsPerStory)
+                  << " rooms\n";
+    }
+
+    return 0;
 }
 ```
 
@@ -2604,37 +3082,11 @@ std::cout << "The second element is: " << mypair.second << '\n';
 
 
 
-## range-based循环
-
-1. 可以循环迭代 container/range的内容：`for (some_type element_name : container_name)`
-
-2. ==element_name 实际上是元素的复制，若想使用实际元素，可以用引用类型==：
-
-   ```c++
-   #include <iostream>
-   #include <vector>
-   int main()
-   {
-       std::vector<int> v = { 1, 2, 3, 4, 5 };
-       v.push_back(10);
-       for (int& el : v)
-       {
-           el = 2;
-       }
-       for (int el : v)
-       {
-           std::cout << el;
-       }
-   }
-   ```
-
-   
-
 ## 迭代器
 
-1. 迭代器类似于容器元素的指针，通过++指向下一个元素，使用*获取指针元素
+1. 迭代器是容器元素的指针，通过++指向下一个元素，使用*获取指针元素
 
-2. 最后一个元素的迭代器为.end()
+2. 可以通过`array.end() array.begin()`来获得，也可以通过`std::begin(array)`和`std::end(array)`获得
 
    ```c++
    #include <iostream>
@@ -2668,13 +3120,13 @@ std::cout << "The second element is: " << mypair.second << '\n';
    }
    ```
 
-   4. 通过迭代器初始化一个容器
+4. 通过迭代器初始化一个容器
+
+   ```c++
+   std::set<int> dict(to_delete.begin(),to_delete.end());
+   ```
+
    
-      ```c++
-      std::set<int> dict(to_delete.begin(),to_delete.end());
-      ```
-   
-      
 
 ## 算法工具
 
@@ -2683,6 +3135,44 @@ std::cout << "The second element is: " << mypair.second << '\n';
 ```cpp
 #include <algorithm> // std::max
 #include <cmath> // std::abs
+```
+
+#### std::reduce, std::accumulate, std::shuffle
+
++ std::reduce对所有元素累计运算，默认是累加
++ std::accumulate累加运算
++ std::shuffle打乱一个列表的顺序
+
+```cpp
+#include <algorithm> // std::shuffle
+#include <array>
+#include <ctime>
+#include <iostream>
+#include <numeric> // std::reduce
+#include <random>
+
+int main()
+{
+  std::array arr{ 1, 2, 3, 4 };
+
+  std::cout << std::reduce(arr.begin(), arr.end()) << '\n'; // 10
+
+  // If you can't use std::reduce, use std::accumulate. The 0 is the initial value
+  // of the result: (((0 + 1) + 2) + 3) + 4
+  std::cout << std::accumulate(arr.begin(), arr.end(), 0) << '\n'; // 10
+
+  std::mt19937 mt{ static_cast<std::mt19937::result_type>(std::time(nullptr)) };
+  std::shuffle(arr.begin(), arr.end(), mt);
+
+  for (int i : arr)
+  {
+    std::cout << i << ' ';
+  }
+
+  std::cout << '\n';
+
+  return 0;
+}
 ```
 
 ### std::sort
@@ -2700,8 +3190,11 @@ int main()
     {
         std::cout << el << '\n';
     }
-    // 从大到小
+    // 从大到小，C++17之后不需要指定类型
     std::sort(v.begin(), v.end(), std::greater<>());
+    // C11需要指定类型
+    // 使用{}是因为这不是一个可调用函数，是一个匿名object
+    std::sort(v.begin(), v.end(), std::greater<int>{});
     for (auto el : v)
     {
         std::cout << el << '\n';
@@ -2709,7 +3202,11 @@ int main()
 }
 ```
 
-### std::find
+### std::find  std::find_if
+
+> `std::find`成功找到时会返回其iterator指针，若未找到则返回iterator的end指针
+>
+> `std::find_if`会在找到时返回True
 
 ```c++
 #include <iostream>
@@ -2729,6 +3226,109 @@ int main()
     }
 }
 
+```
+
+
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <string_view>
+
+// Our function will return true if the element matches
+bool containsNut(std::string_view str)
+{
+    // std::string_view::find returns std::string_view::npos if it doesn't find
+    // the substring. Otherwise it returns the index where the substring occurs
+    // in str.
+    return (str.find("nut") != std::string_view::npos);
+}
+
+int main()
+{
+    std::array<std::string_view, 4> arr{ "apple", "banana", "walnut", "lemon" };
+
+    // Scan our array to see if any elements contain the "nut" substring
+    auto found{ std::find_if(arr.begin(), arr.end(), containsNut) };
+
+    if (found == arr.end())
+    {
+        std::cout << "No nuts\n";
+    }
+    else
+    {
+        std::cout << "Found " << *found << '\n';
+    }
+
+    return 0;
+}
+```
+
+### std::count and std::count_if
+
+> 计算了出现了多少次
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <string_view>
+
+bool containsNut(std::string_view str)
+{
+	return (str.find("nut") != std::string_view::npos);
+}
+
+int main()
+{
+	std::array<std::string_view, 5> arr{ "apple", "banana", "walnut", "lemon", "peanut" };
+
+	auto nuts{ std::count_if(arr.begin(), arr.end(), containsNut) };
+
+	std::cout << "Counted " << nuts << " nut(s)\n";
+
+	return 0;
+}
+```
+
+### std::next
+
+跳到下一个元素的指针
+
+```cpp
+std::for_each(std::next(arr.begin()), arr.end(), doubleNumber);
+// Now arr is [1, 4, 6, 8]. The first element wasn't doubled.
+```
+
+### std::for_each
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+
+void doubleNumber(int& i)
+{
+    i *= 2;
+}
+
+int main()
+{
+    std::array arr{ 1, 2, 3, 4 };
+
+    std::for_each(arr.begin(), arr.end(), doubleNumber);
+    std::ranges::for_each(arr, doubleNumber); // Since C++20, we don't have to use begin() and end().
+
+    for (int i : arr)
+    {
+        std::cout << i << ' ';
+    }
+
+    std::cout << '\n';
+
+    return 0;
+}
 ```
 
 ### std::copy

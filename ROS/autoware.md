@@ -10,6 +10,12 @@
 
 命令行暂停：`ctrl + s`暂停，输入`ctrl + q`继续
 
+## map_file
+
+![image-20221024164146001](autoware.assets/image-20221024164146001.png)
+
+
+
 ## ndt_mapping
 
 启动建图模块：
