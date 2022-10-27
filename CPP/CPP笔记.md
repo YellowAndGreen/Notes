@@ -31,17 +31,31 @@ a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。
 ## main参数
 
 > int argc:          英文名为arguments count(参数计数)
-> char** argv:    英文名为arguments value/vector(参数值)
+> char \*\* argv:    英文名为arguments value/vector(参数值)，同char\* argv[]一样
 > argv[0] 指向程序运行时的全路径名
 > argv[i] 指向程序在DOS命令中执行程序名后的第i个字符串
 > argv[argc]数组越界.
 
 ```c++
-int main(int argc,char** argv)
+int main(int argc,char* argv[])
 {
 ....
 return 0; // 可以不写这句话，在main中若不写return则默认有return 0;
 }
+```
+
++ 转换命令行参数到int类型
+
+```cpp
+#include <sstream> // for std::stringstream
+
+std::stringstream convert{ argv[1] }; // set up a stringstream variable named convert, initialized with the input from argv[1]
+
+int myint{};
+if (!(convert >> myint)) // do the conversion
+    myint = 0; // if conversion fails, set myint to a default value
+
+std::cout << "Got integer: " << myint << '\n';
 ```
 
 ## 暂停程序
@@ -50,12 +64,6 @@ return 0; // 可以不写这句话，在main中若不写return则默认有return
 // 程序暂停一下，按任意键继续
 system("pause");
 ```
-
-
-
-
-
-
 
 # 变量
 
@@ -374,6 +382,8 @@ for(size_t i=0;i<10;i++){...}
 
 1. 基本
 
+   + 常数数组的元素不能被引用
+
 ```c++
 #include <iterator> // for std::size
 
@@ -387,6 +397,12 @@ std::cout << sizeof a/sizeof a[0];
 // c++17的长度获取方式
 int array[]{ 1, 1, 2, 3, 5, 8, 13, 21 };
 std::cout << "The array has: " << std::size(array) << " elements\n";
+
+int main()
+{
+    const int arr[5] = {1,2,3,4};
+    int* ptr = &arr[2];  // 错误，常数数组的元素不能被引用
+}
 ```
 
 2. 函数传递的数组实际上是数组第一个元素的指针，因此在函数中修改和遍历数组有影响，且函数中不能使用`std::size(array)`
@@ -1781,11 +1797,350 @@ int main()
 }
 ```
 
+## 函数指针
+
+1. 定义
+
+```cpp
+// fcnPtr is a pointer to a function that takes no arguments and returns an integer
+int (*fcnPtr)();
+// 函数指针是const
+int (*const fcnPtr)();
+// 返回类型是const int
+const int (*fcnPtr)();
+```
+
+2. 通过指针使用函数，通过函数指针无法使用**默认参数**！
+
+```cpp
+int foo(int x)
+{
+    return x;
+}
+
+int main()
+{
+    int (*fcnPtr)(int){ &foo }; // Initialize fcnPtr with function foo
+    (*fcnPtr)(5); // call function foo(5) through fcnPtr.
+    fcnPtr(5); // call function foo(5) through fcnPtr. 隐式转换，旧编译器可能不支持
+
+    return 0;
+}
+```
+
+3. 将函数指针作为函数参数来进行回调
+
+4. 简化
+
+   1. 可以通过类型别称简化
+
+      ```
+      using ValidateFunction = bool(*)(int, int);
+      ```
+
+   2. 使用**std::function**获取函数指针，第一个值是返回类型，圆括号内是参数类型
+
+      ```cpp
+      #include <functional>
+      bool validate(int x, int y, std::function<bool(int, int)> fcn); // std::function method that returns a bool and takes two int parameters
+      ```
+
+   3. 将以上两种一起用
+
+      ```cpp
+      using ValidateFunctionRaw = bool(*)(int, int); // type alias to raw function pointer
+      using ValidateFunction = std::function<bool(int, int)>; // type alias to std::function
+      ```
+
+
+
+## 堆和栈
+
+### 堆
+
+**In C++, when you use the new operator to allocate memory, this memory is allocated in the application’s heap segment.**
+
+```cpp
+int* ptr { new int }; // ptr is assigned 4 bytes in the heap
+int* array { new int[10] }; // array is assigned 40 bytes in the heap
+```
+
+The heap has advantages and disadvantages:
+
+- Allocating memory on the heap is comparatively slow.
+- Allocated memory stays allocated until it is specifically deallocated (beware memory leaks) or the application ends (at which point the OS should clean it up).
+- Dynamically allocated memory must be accessed through a pointer. Dereferencing a pointer is slower than accessing a variable directly.
+- Because the heap is a big pool of memory, large arrays, structures, or classes can be allocated here.
+
+### 栈
+
++ 栈跟踪所有被调用但未结束的函数，处理所有函数和本地变量的内存分配
++ 在堆上push和pop的对象都叫**stack frames**
++ 一个stack frame跟踪一个函数调用有关的所有数据
++ **Stack overflow**：栈的所有内存都用光了，再继续分配造成
+
+The stack has advantages and disadvantages:
+
+- Allocating memory on the stack is comparatively fast.
+- Memory allocated on the stack stays in scope as long as it is on the stack. It is destroyed when it is popped off the stack.
+- All memory allocated on the stack is known at compile time. Consequently, this memory can be accessed directly through a variable.
+- Because the stack is relatively small, it is generally not a good idea to do anything that eats up lots of stack space. This includes passing by value or creating local variables of large arrays or other memory-intensive structures.
+
+## 匿名函数
+
+```
+[ captureClause ] ( parameters ) -> returnType
+{
+    statements;
+}
+```
+
++ 若省略返回类型，则默认为auto，但函数返回类型在第一次推导后就不变且不再推导了，因此需要保证前后返回类型一致
++ 使用函数指针，`auto`和`std::function`初始化匿名函数变量。优先使用auto，auto有时会因为不能在编译时弄清类型而出错，使用`std::function`即可。
+
+```cpp
+#include <functional>
+
+int main()
+{
+  // A regular function pointer. Only works with an empty capture clause (empty []).
+  double (*addNumbers1)(double, double){
+    [](double a, double b) {
+      return (a + b);
+    }
+  };
+
+  addNumbers1(1, 2);
+
+  // Using std::function. The lambda could have a non-empty capture clause (discussed next lesson).
+  std::function addNumbers2{ // note: pre-C++17, use std::function<double(double, double)> instead
+    [](double a, double b) {
+      return (a + b);
+    }
+  };
+
+  addNumbers2(3, 4);
+
+  // Using auto. Stores the lambda with its real type.
+  auto addNumbers3{
+    [](double a, double b) {
+      return (a + b);
+    }
+  };
+
+  addNumbers3(5, 6);
+
+  return 0;
+}
+```
+
++ 使用auto作为参数的lambda叫泛型lambda，和函数模板类似。下面即使使用了static，也是两个不同的函数，因此不会相互影响。
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <string_view>
+
+int main()
+{
+  // Print a value and count how many times @print has been called.
+  auto print{
+    [](auto value) {
+      static int callCount{ 0 };
+      std::cout << callCount++ << ": " << value << '\n';
+    }
+  };
+
+  print("hello"); // 0: hello
+  print("world"); // 1: world
+
+  print(1); // 0: 1
+  print(2); // 1: 2
+
+  print("ding dong"); // 2: ding dong
+
+  return 0;
+}
+```
+
+### 捕获
+
+captureClause使匿名函数能够访问到外部scope的变量，在[]中列出需要获取的变量即可
+
++ 最好使用变量引用而不是变量本身：`[&comparisons](const auto& a, const auto& b)`
+
+  > captureClause的工作原理是将列出的变量**复制**一份，放到lambda的scope中
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <string_view>
+#include <string>
+
+int main()
+{
+  std::array<std::string_view, 4> arr{ "apple", "banana", "walnut", "lemon" };
+  std::cout << "search for: ";
+  std::string search{};
+  std::cin >> search;
+  // Capture @search                                vvvvvv
+  auto found{ std::find_if(arr.begin(), arr.end(), [search](std::string_view str) {
+    return (str.find(search) != std::string_view::npos);
+  }) };
+  if (found == arr.end())
+  {
+    std::cout << "Not found\n";
+  }
+  else
+  {
+    std::cout << "Found " << *found << '\n';
+  }
+  return 0;
+}
+```
+
++ captureClause复制后的变量默认是`const`，若需要修改则需要加上`mutable`关键字
++ 变量只会复制一次，之后会一直存在，因此若加了`mutable`，则修改后下次调用也是修改后的值
+
+```cpp
+#include <iostream>
+
+int main()
+{
+  int ammo{ 10 };
+
+  auto shoot{
+    // Added mutable after the parameter list.
+    [ammo]() mutable {
+      // We're allowed to modify ammo now
+      --ammo;
+
+      std::cout << "Pew! " << ammo << " shot(s) left.\n";
+    }
+  };
+
+  shoot();
+  shoot();
+
+  std::cout << ammo << " shot(s) left\n";
+
+  return 0;
+}
+Pew! 9 shot(s) left.
+Pew! 8 shot(s) left.
+10 shot(s) left
+```
+
+### 默认捕获
+
+默认捕获会自动捕获在lambda中使用的所有变量。通过值捕获`[=]`，通过引用捕获`[&]`。
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <iostream>
+
+int main()
+{
+  std::array areas{ 100, 25, 121, 40, 56 };
+
+  int width{};
+  int height{};
+
+  std::cout << "Enter width and height: ";
+  std::cin >> width >> height;
+
+  auto found{ std::find_if(areas.begin(), areas.end(),
+                           [=](int knownArea) { // will default capture width and height by value
+                             return (width * height == knownArea); // because they're mentioned here
+                           }) };
+
+  if (found == areas.end())
+  {
+    std::cout << "I don't know this area :(\n";
+  }
+  else
+  {
+    std::cout << "Area found :)\n";
+  }
+
+  return 0;
+}
+```
+
++ 使用多个捕获规则
+
+```cpp
+int health{ 33 };
+int armor{ 100 };
+std::vector<CEnemy> enemies{};
+
+// Capture health and armor by value, and enemies by reference.
+[health, armor, &enemies](){};
+
+// Capture enemies by reference and everything else by value.
+[=, &enemies](){};
+
+// Capture armor by value and everything else by reference.
+[&, armor](){};
+
+// Illegal, we already said we want to capture everything by reference.
+[&, &armor](){};
+
+// Illegal, we already said we want to capture everything by value.
+[=, armor](){};
+
+// Illegal, armor appears twice.
+[armor, &health, &armor](){};
+
+// Illegal, the default capture has to be the first element in the capture group.
+[armor, &](){};
+```
+
+### 匿名函数的copy和引用
+
+使用`std::function`可能会将复制一份匿名函数，因此使用`std::ref`来将copy操作转换为`copy引用`操作
+
+```cpp
+#include <iostream>
+#include <functional>
+
+void myInvoke(const std::function<void()>& fn)
+{
+    fn();
+}
+
+int main()
+{
+    int i{ 0 };
+
+    // Increments and prints its local copy of @i.
+    auto count{ [i]() mutable {
+      std::cout << ++i << '\n';
+    } };
+
+    // std::ref(count) ensures count is treated like a reference
+    // thus, anything that tries to copy count will actually copy the reference
+    // ensuring that only one count exists
+    myInvoke(std::ref(count));
+    myInvoke(std::ref(count));
+    myInvoke(std::ref(count));
+
+    return 0;
+}
+```
+
+
+
 # 面向对象
 
 ## 类
 
 1. 不修改成员字段的类方法应该加上const前缀：`std::string getname() const { return name; }`
+
+   同理，一个类变量的getter应该返回**常量引用**而不是引用
 
 ```c++
 // 声明一个类
@@ -1848,6 +2203,7 @@ MyClass::x = 456;
 ```c++
 class MyClass
 {
+// 在没有指示符定义的地方，默认是private
 public:
 // everything in here
 // has public access level
@@ -1907,13 +2263,71 @@ int main()
 }
 ```
 
+3. 通过引用获取到类实例的私有变量
 
+```cpp
+#include <iostream>
+
+class DateClass // members are private by default
+{
+	int m_month {}; // private by default, can only be accessed by other members
+	int m_day {}; // private by default, can only be accessed by other members
+	int m_year {}; // private by default, can only be accessed by other members
+public:
+	void setDate(int month, int day, int year)
+	{
+		m_month = month;
+		m_day = day;
+		m_year = year;
+	}
+	void print()
+	{
+		std::cout << m_month << '/' << m_day << '/' << m_year;
+	}
+	// Note the addition of this function
+	void copyFrom(const DateClass& d)
+	{
+		// Note that we can access the private members of d directly
+		m_month = d.m_month;
+		m_day = d.m_day;
+		m_year = d.m_year;
+	}
+};
+int main()
+{
+	DateClass date;
+	date.setDate(10, 14, 2020); // okay, because setDate() is public
+	DateClass copy {};
+	copy.copyFrom(date); // okay, because copyFrom() is public
+	copy.print();
+	std::cout << '\n';
+	return 0;
+}
+```
 
 ## 构造器
 
++ 构造器必须和类的名字相同
+
++ 构造器没有返回类型
+
++ 值初始化(favor)和默认初始化
+
+  ```cpp
+  class Fraction
+  {
+  public:
+      Fraction() { std::cout << "A\n"; }
+  };
+  // 若没有定义构造器或者初始化方式，则值初始化会设为0，而默认初始化可能会出错。
+  // 下面两种方法均会调用默认初始化方法
+  Fraction frac {}; // Value initialization using empty set of braces
+  Fraction frac;    // Default-initialization, calls default constructor
+  ```
+
 ### 默认构造器
 
-无参或者有默认参数的构造器是默认构造器
++ 无参或者有默认参数的构造器是默认构造器
 
 ```c++
 #include <iostream>
@@ -1931,7 +2345,7 @@ MyClass o; // invoke a default constructor
 }
 ```
 
-默认参数
++ 默认参数
 
 ```c++
 #include <iostream>
@@ -1953,7 +2367,41 @@ std::cout << o.x << ' ' << o.y;
 }
 ```
 
-**更简洁的初始化**
++ 若不定义构造器，则会自动加上默认构造器，若已定义构造器，则不会自动加
+
+  此时的默认构造器会使用变量自身的初始化值，若没有会zero初始化
+
+  在已定义构造器时还想使用默认构造器，则可以：
+
+```cpp
+class Date
+{
+private:
+    int m_year{ 1900 };
+    int m_month{ 1 };
+    int m_day{ 1 };
+public:
+    // Tell the compiler to create a default constructor, even if
+    // there are other user-provided constructors.
+    Date() = default;
+
+    Date(int year, int month, int day) // normal non-default constructor
+    {
+        m_year = year;
+        m_month = month;
+        m_day = day;
+    }
+};
+int main()
+{
+    Date date{}; // date is initialized to Jan 1st, 1900
+    Date today{ 2020, 10, 14 }; // today is initialized to Oct 14th, 2020
+
+    return 0;
+}
+```
+
++ **更简洁的初始化**
 
 ```c++
 #include <iostream>
@@ -2702,6 +3150,10 @@ int main(int argc, const char *argv[])
 
 ## 常用
 
+### std::ref
+
+防止默认的值复制，使得其copy的操作永远智能复制其引用
+
 ### 程序退出
 
 #### std::exit
@@ -2807,7 +3259,11 @@ int main()
 
 ![image-20220507092106079](img/image-20220507092106079.png)
 
++ `back()` returns the value of the top element on the stack.
 + `resize(len)`: 修改数组的长度
++ 使用`length`或者`size`来获取数组的长度
++ 使用`capacity()`来获取数组的容量（个数上限，一定比`size`大）
++ `reserve`()来预分配一定的`capacity`，因为数组resize很贵
 
 ```c++
 #include <vector>
@@ -3135,6 +3591,9 @@ std::cout << "The second element is: " << mypair.second << '\n';
 ```cpp
 #include <algorithm> // std::max
 #include <cmath> // std::abs
+
+std::all_of  // 判断是否所有元素均符合条件
+std::all_of(array.begin(), array.end(), [](int i){ return ((i % 2) == 0); })
 ```
 
 #### std::reduce, std::accumulate, std::shuffle
