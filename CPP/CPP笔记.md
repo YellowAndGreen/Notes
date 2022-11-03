@@ -24,7 +24,9 @@ cost = quantity * 2 * storePrice;
 
 a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。如果只是希望增加a 的值，而不需要返回值，则推荐使用++a，其运行速度会略快一些。
 
-**因为先加1再输出的方式省去了对a复制一个新的copy，以及之后删除这个临时copy的时间和空间**
+**因为先加1再输出的方式是对自身起作用，而后加需要返回初始值，因此会创建一个新的copy来储存计算后的值**
+
+**省去了对a复制一个新的copy，以及之后删除这个临时copy的时间和空间**
 
 ![image-20220923220015172](CPP笔记.assets/image-20220923220015172.png)
 
@@ -408,6 +410,8 @@ int main()
 2. 函数传递的数组实际上是数组第一个元素的指针，因此在函数中修改和遍历数组有影响，且函数中不能使用`std::size(array)`
 
    **但在结构体或class中的数组不会自动转换(decay)！！！**
+   
+   对数组指针用下标也能获取到值
 
 > 在函数参数中，`int array[]`会自动转换为`int* array`，为了更易懂，最好在参数中直接写后者
 
@@ -654,7 +658,7 @@ int main()
 
 #### 自身是常数的指针(high-level)
 
-+ 指针的地址之后不能被修改
++ 指针的地址之后不能被修改，但其地址所指向的值可以更改
 + 同常数一样，必须在一开始初始化
 
 ```cpp
@@ -838,8 +842,9 @@ std::cout << *intPtr << '\n'; // then we can dereference the result
 + 所有的引用都必须初始化
 + 引用类型必须和被引用的类型一致
 + 引用类型不能重新指向其他lvalue
-+ 引用常量必须在类型前加上const  `const int& ref { x };`
++ **引用常量，字面量或者临时变量必须在类型前加上const**  `const int& ref { x };`
 + 常量引用可以通过rvalue初始化  `const int& ref { 5 }; // okay: 5 is an rvalue`
++ **临时变量是rvalue，执行后就被丢弃了**
 
 ```c++
 int x = 123;
@@ -2132,7 +2137,623 @@ int main()
 }
 ```
 
+# 操作符重载
 
+编译器进行操作符重载时遵循下列规则：
+
+- If *all* of the operands are fundamental data types, the compiler will call a built-in routine if one exists. If one does not exist, the compiler will produce a compiler error.
+- If *any* of the operands are user data types (e.g. one of your classes, or an enum type), the compiler looks to see whether the type has a matching overloaded operator function that it can call. If it can’t find one, it will try to convert one or more of the user-defined type operands into fundamental data types so it can use a matching built-in operator (via an overloaded typecast, which we’ll cover later in this chapter). If that fails, then it will produce a compile error.
+
+操作符重载的限制：
+
++ 不能重载两个基本类型的操作，也就是说必须有一个以上user-defined type
++ 操作符的优先级和之前相同
+
+> 由于`^`的优先级低于其他算术操作符，因此将其重载为计算指数会出现错误：4 + 3 ^ 2 resolves as 4 + (3 ^ 2) 
+
+## 三种重载方式
+
+- If you’re overloading assignment (=), subscript ([]), function call (()), or member selection (->), do so as a member function.
+- If you’re overloading a **unary** operator, do so as a member function.
+- If you’re overloading a **binary** operator that does not modify its left operand (e.g. operator+), do so as a normal function (preferred) or friend function.
+- If you’re overloading a binary operator that modifies its left operand, but you can’t add members to the class definition of the left operand (e.g. operator**<<**, which has a left operand of type ostream), do so as a normal function (preferred) or friend function.
+- If you’re overloading a binary operator that modifies its left operand (e.g. operator+=), and you can modify the definition of the left operand, do so as a member function.
+
+### 使用友元函数重载
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+	int m_cents {};
+
+public:
+	Cents(int cents) : m_cents{ cents } { }
+
+	// add Cents + int using a friend function
+	friend Cents operator+(const Cents& c1, int value);
+
+	// add int + Cents using a friend function
+	friend Cents operator+(int value, const Cents& c1);
+
+
+	int getCents() const { return m_cents; }
+};
+
+// note: this function is not a member function!
+Cents operator+(const Cents& c1, int value)
+{
+	// use the Cents constructor and operator+(int, int)
+	// we can access m_cents directly because this is a friend function
+	return { c1.m_cents + value };
+}
+
+// note: this function is not a member function!
+Cents operator+(int value, const Cents& c1)
+{
+	// use the Cents constructor and operator+(int, int)
+	// we can access m_cents directly because this is a friend function
+	return { c1.m_cents + value };
+}
+
+int main()
+{
+	Cents c1{ Cents{ 4 } + 6 };
+	Cents c2{ 6 + Cents{ 4 } };
+
+	std::cout << "I have " << c1.getCents() << " cents.\n";
+	std::cout << "I have " << c2.getCents() << " cents.\n";
+
+	return 0;
+}
+```
+
+### 普通函数重载
+
++ 与友元函数不同仅在于对于私有变量的权限不同
++ 更倾向于使用普通函数（在不需要额外权限的情况下）
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+  int m_cents{};
+
+public:
+  Cents(int cents)
+    : m_cents{ cents }
+  {}
+
+  int getCents() const { return m_cents; }
+};
+
+// note: this function is not a member function nor a friend function!
+Cents operator+(const Cents& c1, const Cents& c2)
+{
+  // use the Cents constructor and operator+(int, int)
+  // we don't need direct access to private members here
+  return Cents{ c1.getCents() + c2.getCents() };
+}
+
+int main()
+{
+  Cents cents1{ 6 };
+  Cents cents2{ 8 };
+  Cents centsSum{ cents1 + cents2 };
+  std::cout << "I have " << centsSum.getCents() << " cents.\n";
+
+  return 0;
+}
+```
+
+### 成员函数重载
+
+Converting a friend overloaded operator to a member overloaded operator is easy:
+
+1. The overloaded operator is defined as a member instead of a friend (Cents::operator+ instead of friend operator+)
+2. The left parameter is removed, because that parameter now becomes the implicit *this object.
+3. Inside the function body, all references to the left parameter can be removed (e.g. cents.m_cents becomes m_cents, which implicitly references the *this object).
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+    int m_cents {};
+
+public:
+    Cents(int cents)
+        : m_cents { cents } { }
+
+    // Overload Cents + int
+    Cents operator+ (int value);
+
+    int getCents() const { return m_cents; }
+};
+
+// note: this function is a member function!
+// the cents parameter in the friend version is now the implicit *this parameter
+Cents Cents::operator+ (int value)
+{
+    return Cents { m_cents + value };
+}
+
+int main()
+{
+	Cents cents1 { 6 };
+	Cents cents2 { cents1 + 2 };
+	std::cout << "I have " << cents2.getCents() << " cents.\n";
+
+	return 0;
+}
+```
+
+## 单元素操作符
+
+```cpp
+#include <iostream>
+
+class Point
+{
+private:
+    double m_x {};
+    double m_y {};
+    double m_z {};
+
+public:
+    Point(double x=0.0, double y=0.0, double z=0.0):
+        m_x{x}, m_y{y}, m_z{z}
+    {
+    }
+
+    // Convert a Point into its negative equivalent
+    Point operator- () const;
+
+    // Return true if the point is set at the origin
+    bool operator! () const;
+
+    double getX() const { return m_x; }
+    double getY() const { return m_y; }
+    double getZ() const { return m_z; }
+};
+
+// Convert a Point into its negative equivalent
+Point Point::operator- () const
+{
+    return { -m_x, -m_y, -m_z };
+}
+
+// Return true if the point is set at the origin, false otherwise
+bool Point::operator! () const
+{
+    return (m_x == 0.0 && m_y == 0.0 && m_z == 0.0);
+}
+
+int main()
+{
+    Point point{}; // use default constructor to set to (0.0, 0.0, 0.0)
+
+    if (!point)
+        std::cout << "point is set at the origin.\n";
+    else
+        std::cout << "point is not set at the origin.\n";
+
+    return 0;
+}
+```
+
+## 比较操作符
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+    int m_cents;
+
+public:
+    Cents(int cents)
+        : m_cents{ cents }
+    {}
+
+    friend bool operator== (const Cents& c1, const Cents& c2);
+    friend bool operator!= (const Cents& c1, const Cents& c2);
+
+    friend bool operator< (const Cents& c1, const Cents& c2);
+    friend bool operator> (const Cents& c1, const Cents& c2);
+
+    friend bool operator<= (const Cents& c1, const Cents& c2);
+    friend bool operator>= (const Cents& c1, const Cents& c2);
+
+};
+
+bool operator== (const Cents& c1, const Cents& c2)
+{
+    return c1.m_cents == c2.m_cents;
+}
+
+bool operator!= (const Cents& c1, const Cents& c2)
+{
+    return !(operator==(c1, c2));
+}
+
+bool operator< (const Cents& c1, const Cents& c2)
+{
+    return c1.m_cents < c2.m_cents;
+}
+
+bool operator> (const Cents& c1, const Cents& c2)
+{
+    return operator<(c2, c1);
+}
+
+bool operator<= (const Cents& c1, const Cents& c2)
+{
+    return !(operator>(c1, c2));
+}
+
+bool operator>= (const Cents& c1, const Cents& c2)
+{
+    return !(operator<(c1, c2));
+}
+
+int main()
+{
+    Cents dime{ 10 };
+    Cents nickel{ 5 };
+
+    if (nickel > dime)
+        std::cout << "a nickel is greater than a dime.\n";
+    if (nickel >= dime)
+        std::cout << "a nickel is greater than or equal to a dime.\n";
+    if (nickel < dime)
+        std::cout << "a dime is greater than a nickel.\n";
+    if (nickel <= dime)
+        std::cout << "a dime is greater than or equal to a nickel.\n";
+    if (nickel == dime)
+        std::cout << "a dime is equal to a nickel.\n";
+    if (nickel != dime)
+        std::cout << "a dime is not equal to a nickel.\n";
+
+    return 0;
+}
+```
+
+## 递增和递减操作符
+
+后缀和前缀是有区别的，编译器从重载操作符的参数中看是否有int参数来判断，有则是后缀递增，反之。
+
+```cpp
+class Digit
+{
+private:
+    int m_digit;
+public:
+    Digit(int digit=0)
+        : m_digit{digit}
+    {
+    }
+
+    Digit& operator++(); // prefix has no parameter
+    Digit& operator--(); // prefix has no parameter
+
+    Digit operator++(int); // postfix has an int parameter
+    Digit operator--(int); // postfix has an int parameter
+
+    friend std::ostream& operator<< (std::ostream& out, const Digit& d);
+};
+
+// No parameter means this is prefix operator++
+Digit& Digit::operator++()
+{
+    // If our number is already at 9, wrap around to 0
+    if (m_digit == 9)
+        m_digit = 0;
+    // otherwise just increment to next number
+    else
+        ++m_digit;
+
+    return *this;
+}
+
+// No parameter means this is prefix operator--
+Digit& Digit::operator--()
+{
+    // If our number is already at 0, wrap around to 9
+    if (m_digit == 0)
+        m_digit = 9;
+    // otherwise just decrement to next number
+    else
+        --m_digit;
+
+    return *this;
+}
+
+// int parameter means this is postfix operator++
+Digit Digit::operator++(int)
+{
+    // Create a temporary variable with our current digit
+    Digit temp{*this};
+
+    // Use prefix operator to increment this digit
+    ++(*this); // apply operator
+
+    // return temporary result
+    return temp; // return saved state
+}
+
+// int parameter means this is postfix operator--
+Digit Digit::operator--(int)
+{
+    // Create a temporary variable with our current digit
+    Digit temp{*this};
+
+    // Use prefix operator to decrement this digit
+    --(*this); // apply operator
+
+    // return temporary result
+    return temp; // return saved state
+}
+
+std::ostream& operator<< (std::ostream& out, const Digit& d)
+{
+	out << d.m_digit;
+	return out;
+}
+
+int main()
+{
+    Digit digit(5);
+
+    std::cout << digit;
+    std::cout << ++digit; // calls Digit::operator++();
+    std::cout << digit++; // calls Digit::operator++(int);
+    std::cout << digit;
+    std::cout << --digit; // calls Digit::operator--();
+    std::cout << digit--; // calls Digit::operator--(int);
+    std::cout << digit;
+
+    return 0;
+}
+```
+
+## I/O操作符重载
+
+```cpp
+#include <iostream>
+
+class Point
+{
+private:
+    double m_x{};
+    double m_y{};
+    double m_z{};
+
+public:
+    Point(double x=0.0, double y=0.0, double z=0.0)
+      : m_x{x}, m_y{y}, m_z{z}
+    {
+    }
+
+    friend std::ostream& operator<< (std::ostream& out, const Point& point);
+    friend std::istream& operator>> (std::istream& in, Point& point);
+};
+
+std::ostream& operator<< (std::ostream& out, const Point& point)
+{
+    // Since operator<< is a friend of the Point class, we can access Point's members directly.
+    out << "Point(" << point.m_x << ", " << point.m_y << ", " << point.m_z << ')';
+
+    return out;
+}
+
+std::istream& operator>> (std::istream& in, Point& point)
+{
+    // Since operator>> is a friend of the Point class, we can access Point's members directly.
+    // note that parameter point must be non-const so we can modify the class members with the input values
+    in >> point.m_x;
+    in >> point.m_y;
+    in >> point.m_z;
+
+    return in;
+}
+
+int main()
+{
+    std::cout << "Enter a point: ";
+
+    Point point;
+    std::cin >> point;
+
+    std::cout << "You entered: " << point << '\n';
+
+    return 0;
+}
+```
+
+## 下标操作符
+
++ 以引用返回，因为是lvalue，所以可以进行赋值
++ 对于常量实例，可以额外定义一个常量成员函数
++ 对于没有重载的下标可以使用指针的下标操作符改变元素，但是重载之后不行，必须经过解码才能使用
+
+```cpp
+#include <iostream>
+
+class IntList
+{
+private:
+    int m_list[10]{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // give this class some initial state for this example
+
+public:
+    int& operator[] (int index);
+    int operator[] (int index) const; // could also return const int& if returning a non-fundamental type
+};
+
+int& IntList::operator[] (int index) // for non-const objects: can be used for assignment
+{
+    return m_list[index];
+}
+
+int IntList::operator[] (int index) const // for const objects: can only be used for access
+{
+    return m_list[index];
+}
+
+int main()
+{
+    IntList list{};
+    list[2] = 3; // okay: calls non-const version of operator[]
+    std::cout << list[2] << '\n';
+
+    const IntList clist{};
+    clist[2] = 3; // compile error: calls const version of operator[], which returns by value.  Cannot assign to this because it is an rvalue.
+    std::cout << clist[2] << '\n';
+
+    return 0;
+}
+```
+
+## 圆括号操作符
+
++ 可以使类实例能够像函数一样调用
+
+```cpp
+#include <iostream>
+
+class Accumulator
+{
+private:
+    int m_counter{ 0 };
+
+public:
+    int operator() (int i) { return (m_counter += i); }
+};
+
+int main()
+{
+    Accumulator acc{};
+    std::cout << acc(10) << '\n'; // prints 10
+    std::cout << acc(20) << '\n'; // prints 30
+
+    return 0;
+}
+```
+
+## 类型转换重载
+
+There are three things to note:
+
+1. To overload the function that casts our class to an int, we write a new function in our class called operator int(). 
+2. User-defined conversions **do not take parameters**, as there is no way to pass arguments to them.
+3. User-defined conversions **do not have a return type**. C++ assumes you will be returning the correct type.
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+    int m_cents;
+public:
+    Cents(int cents=0)
+        : m_cents{ cents }
+    {
+    }
+
+    // Overloaded int cast
+    operator int() const { return m_cents; }
+
+    int getCents() const { return m_cents; }
+    void setCents(int cents) { m_cents = cents; }
+};
+
+int main()
+{
+    Cents cents{ 7 };
+    printInt(cents); // print 7
+
+    std::cout << '\n';
+
+    return 0;
+}
+```
+
+## 分配操作符(=)重载
+
+复制构造器和分配操作符的区别：
+
+- If a new object has to be created before the copying can occur, the copy constructor is used (note: this includes passing or returning objects by value).
+- If a new object does not have to be created before the copying can occur, the assignment operator is used.
+
+> 默认分配操作符：若没有定义，则默认会进行memberwise assignment
+
+```cpp
+#include <cassert>
+#include <iostream>
+
+class Fraction
+{
+private:
+	int m_numerator { 0 };
+	int m_denominator { 1 };
+
+public:
+	// Default constructor
+	Fraction(int numerator = 0, int denominator = 1 )
+		: m_numerator { numerator }, m_denominator { denominator }
+	{
+		assert(denominator != 0);
+	}
+
+	// Copy constructor
+	Fraction(const Fraction& copy)
+		: m_numerator { copy.m_numerator }, m_denominator { copy.m_denominator }
+	{
+		// no need to check for a denominator of 0 here since copy must already be a valid Fraction
+		std::cout << "Copy constructor called\n"; // just to prove it works
+	}
+
+	// Overloaded assignment
+	Fraction& operator= (const Fraction& fraction);
+
+	friend std::ostream& operator<<(std::ostream& out, const Fraction& f1);
+
+};
+
+std::ostream& operator<<(std::ostream& out, const Fraction& f1)
+{
+	out << f1.m_numerator << '/' << f1.m_denominator;
+	return out;
+}
+
+// A simplistic implementation of operator= (see better implementation below)
+Fraction& Fraction::operator= (const Fraction& fraction)
+{
+    // do the copy
+    m_numerator = fraction.m_numerator;
+    m_denominator = fraction.m_denominator;
+
+    // return the existing object so we can chain this operator
+    return *this;
+}
+
+int main()
+{
+    Fraction fiveThirds { 5, 3 };
+    Fraction f;
+    f = fiveThirds; // calls overloaded assignment
+    std::cout << f;
+
+    return 0;
+}
+```
 
 # 面向对象
 
@@ -2201,18 +2822,25 @@ MyClass::x = 456;
 ## 权限指示符
 
 ```c++
-class MyClass
+class Base
 {
-// 在没有指示符定义的地方，默认是private
 public:
-// everything in here
-// has public access level
+    int m_public {}; // can be accessed by anybody
 protected:
-// everything in here
-// has protected access level
+    int m_protected {}; // can be accessed by Base members, friends, and derived classes
 private:
-// everything in here
-// has private access level
+    int m_private {}; // can only be accessed by Base members and friends (but not derived classes)
+};
+
+class Derived: public Base
+{
+public:
+    Derived()
+    {
+        m_public = 1; // allowed: can access public base members from derived class
+        m_protected = 2; // allowed: can access protected base members from derived class
+        m_private = 3; // not allowed: can not access private base members from derived class
+    }
 };
 ```
 
@@ -2401,25 +3029,221 @@ int main()
 }
 ```
 
-+ **更简洁的初始化**
+### member initializer list
+
++ 基本使用
+
+```cpp
+#include <iostream>
+#include <string>
+#include <string_view>
+
+class Ball
+{
+private:
+    std::string m_color{"black"};
+    double m_radius{10.0};
+
+public:
+    Ball()=default;
+    // Constructor with only color parameter (radius will use default value)
+    Ball(std::string_view color):m_color{color}
+    {
+    }
+
+    // Constructor with only radius parameter (color will use default value)
+    Ball(double radius):m_radius{radius}
+    {
+    }
+    // Constructor with both color and radius parameters
+    Ball(std::string_view color, double radius):m_color{color},m_radius{radius}
+    {
+    }
+
+    void print()
+    {
+        std::cout << "color: " << m_color << ", radius: " << m_radius << '\n';
+    }
+};
+
+int main()
+{
+    Ball def;
+    def.print();
+
+    Ball blue{ "blue" };
+    blue.print();
+
+    Ball twenty{ 20.0 };
+    twenty.print();
+
+    Ball blueTwenty{ "blue", 20.0 };
+    blueTwenty.print();
+
+    return 0;
+}
+```
+
++ 默认构造器实质上进行赋值，而member initializer list是对变量初始化，因此可用来初始化常量
 
 ```c++
 #include <iostream>
-class MyClass
+
+class Something
 {
+private:
+	const int m_value;
+
 public:
-int x, y;
-MyClass(int xx, int yy)
-: x{ xx }, y{ yy } // member initializer list
+	Something(int x) : m_value{ x } // directly initialize our const member variable
+	{
+	}
+
+	void print()
+	{
+		std::cout << "Something(" << m_value << ")\n";
+	}
+};
+
+int main()
 {
+	std::cout << "Enter an integer: ";
+	int x{};
+	std::cin >> x;
+
+	Something s{ x };
+	s.print();
+
+	return 0;
 }
+```
+
++ Favor use of **non-static member initialization**(即变量定义时初始化) to give default values for your member variables.而不是在成员初始化列表中初始化。
+
+```cpp
+#include <iostream>
+class Rectangle
+{
+private:
+    double m_length{ 1.0 };
+    double m_width{ 1.0 };
+public:
+    Rectangle(double length, double width)
+        : m_length{ length },
+          m_width{ width }
+    {
+        // m_length and m_width are initialized by the constructor (the default values aren't used)
+    }
+    Rectangle(double length)
+        : m_length{ length }
+    {
+        // m_length is initialized by the constructor.
+        // m_width's default value (1.0) is used.
+    }
+    void print()
+    {
+        std::cout << "length: " << m_length << ", width: " << m_width << '\n';
+    }
+
 };
 int main()
 {
-MyClass o{ 1, 2 }; // invoke a user-defined constructor
-std::cout << o.x << ' ' << o.y;
+    Rectangle x{ 2.0, 3.0 };
+    x.print();
+    Rectangle y{ 4.0 };
+    y.print();
+    return 0;
 }
 ```
+
++ 有多个变量时，可以分为多行写
+
+```cpp
+class Something
+{
+private:
+    int m_value1 {};
+    double m_value2 {};
+    char m_value3 {};
+    float m_value4 {};
+public:
+    Something(int value1, double value2, char value3='c', float value4=34.6f) // this line already has a lot of stuff on it
+        : m_value1{ value1 } // one per line
+        , m_value2{ value2 }
+        , m_value3{ value3 }
+        , m_value4{ value4 }
+    {
+    }
+};
+```
+
++ 类变量初始化的顺序是按在类中声明的顺序初始化的，最好在代码中两者顺序保持一致。
+
+### delegating constructor
+
+> 委派构造器：通过在构造器中使用其他构造器来简化代码
+
+```cpp
+#include <iostream>
+#include <string>
+#include <string_view>
+
+class Employee
+{
+private:
+    int m_id{};
+    std::string m_name{};
+
+public:
+    Employee(int id=0, std::string_view name=""):
+        m_id{ id }, m_name{ name }
+    {
+        std::cout << "Employee " << m_name << " created.\n";
+    }
+
+    // Use a delegating constructor to minimize redundant code
+    Employee(std::string_view name) : Employee{ 0, name }
+    { }
+};
+```
+
++ 委任构造器不能进行初始化操作（如上19行）
++ 使用常规函数来进行setup
+
+```cpp
+#include <iostream>
+class Foo
+{
+private:
+    const int m_value { 0 };
+
+    void setup() // setup is private so it can only be used by our constructors
+    {
+        // code to do some common setup tasks (e.g. open a file or database)
+        std::cout << "Setting things up...\n";
+    }
+public:
+    Foo()
+    {
+        setup();
+    }
+
+    Foo(int value) : m_value { value } // we must initialize m_value since it's const
+    {
+        setup();
+    }
+};
+int main()
+{
+    Foo a;
+    Foo b{ 5 };
+    return 0;
+}
+```
+
+
+
+
 
 ### 子类构造器
 
@@ -2447,25 +3271,64 @@ class Student : public Person{
 
 ### 复制构造器
 
-默认构造器只能进行浅拷贝
++ 复制构造器使得既能够使用列表初始化，也可以使用该类的实例初始化
 
-```c++
+```cpp
+Fraction fiveThirds { 5, 3 }; // Brace initialize a Fraction, calls Fraction(int, int) constructor
+Fraction fCopy { fiveThirds }; // Brace initialize a Fraction -- with copy constructor
+```
+
++ 复制构造器默认存在，可以自行定义，是member-wise初始化
++ 若不想该类使用复制构造器，可以将其放入private中
++ 复制构造器可能被编译器忽略（直接使用参数初始化）：`Fraction fiveThirds { Fraction { 5, 3 } };`
+
+```cpp
+#include <cassert>
 #include <iostream>
-class MyClass
+
+class Fraction
 {
 private:
-int x, y;
+    int m_numerator{};
+    int m_denominator{};
+
 public:
-MyClass(int xx, int yy) : x{ xx }, y{ yy }
-{
-}
+    // Default constructor
+    Fraction(int numerator=0, int denominator=1)
+        : m_numerator{numerator}, m_denominator{denominator}
+    {
+        assert(denominator != 0);
+    }
+
+    // Copy constructor
+    Fraction(const Fraction& fraction)
+        : m_numerator{fraction.m_numerator}, m_denominator{fraction.m_denominator}
+        // Note: We can access the members of parameter fraction directly, because we're inside the Fraction class
+    {
+        // no need to check for a denominator of 0 here since fraction must already be a valid Fraction
+        std::cout << "Copy constructor called\n"; // just to prove it works
+    }
+
+    friend std::ostream& operator<<(std::ostream& out, const Fraction& f1);
 };
+
+std::ostream& operator<<(std::ostream& out, const Fraction& f1)
+{
+	out << f1.m_numerator << '/' << f1.m_denominator;
+	return out;
+}
+
 int main()
 {
-MyClass o1{ 1, 2 };
-MyClass o2 = o1; // default copy constructor invoked
+	Fraction fiveThirds { 5, 3 }; // Direct initialize a Fraction, calls Fraction(int, int) constructor
+	Fraction fCopy { fiveThirds }; // Direct initialize -- with Fraction copy constructor
+	std::cout << fCopy << '\n';
 }
 ```
+
+
+
+默认构造器只能进行浅拷贝
 
 自定义复制构造器
 
@@ -2495,6 +3358,112 @@ int main()
     MyClass o2 = o1; // user defined copy constructor invoked
 }
 ```
+
+### 转换构造器
+
+> 能够用作隐式转换的构造器叫做转换构造器
+
+#### explicit
+
++ 防止隐式类型转换和复制初始化
+
++ 加在构造器函数名之前
+
+```cpp
+#include <string>
+#include <iostream>
+
+class MyString
+{
+private:
+	std::string m_string;
+public:
+	// explicit keyword makes this constructor ineligible for implicit conversions
+	explicit MyString(int x) // allocate string of size x
+	{
+		m_string.resize(x);
+	}
+
+	MyString(const char* string) // allocate string to hold string value
+	{
+		m_string = string;
+	}
+
+	friend std::ostream& operator<<(std::ostream& out, const MyString& s);
+
+};
+
+std::ostream& operator<<(std::ostream& out, const MyString& s)
+{
+	out << s.m_string;
+	return out;
+}
+
+void printString(const MyString& s)
+{
+	std::cout << s;
+}
+
+int main()
+{
+	MyString mine = 'x'; // compile error, since MyString(int) is now explicit and nothing will match this
+	std::cout << mine;
+
+	printString('x'); // compile error, since MyString(int) can't be used for implicit conversions
+
+	return 0;
+}
+```
+
+#### delete
+
++ 使用delete禁止用某个函数（即不允许用某种类型的参数初始化）
++ 同时禁止了隐式转换和显式转换
+
+```cpp
+#include <string>
+#include <iostream>
+
+class MyString
+{
+private:
+	std::string m_string;
+
+public:
+	MyString(char) = delete; // any use of this constructor is an error
+
+	// explicit keyword makes this constructor ineligible for implicit conversions
+	explicit MyString(int x) // allocate string of size x /
+	{
+		m_string.resize(x);
+	}
+
+	MyString(const char* string) // allocate string to hold string value
+	{
+		m_string = string;
+	}
+
+	friend std::ostream& operator<<(std::ostream& out, const MyString& s);
+
+};
+
+std::ostream& operator<<(std::ostream& out, const MyString& s)
+{
+	out << s.m_string;
+	return out;
+}
+
+int main()
+{
+	MyString mine('x'); // compile error, since MyString(char) is deleted
+	std::cout << mine;
+	return 0;
+}
+```
+
+
+
+
 
 ### 移动构造器
 
@@ -2539,9 +3508,750 @@ explicit Person(const std::string& aname)
 
 ![image-20220423164356823](img/image-20220423164356823.png)
 
+### 析构器
+
+**命名规则：**
+
+1. The destructor must have the same name as the class, preceded by a tilde (~).
+2. The destructor can not take arguments.
+3. The destructor has no return type.
+
+```cpp
+#include <iostream>
+
+class Simple
+{
+private:
+    int m_nID{};
+
+public:
+    Simple(int nID)
+        : m_nID{ nID }
+    {
+        std::cout << "Constructing Simple " << nID << '\n';
+    }
+
+    ~Simple()
+    {
+        std::cout << "Destructing Simple" << m_nID << '\n';
+    }
+
+    int getID() { return m_nID; }
+};
+
+int main()
+{
+    // Allocate a Simple on the stack
+    Simple simple{ 1 };
+    std::cout << simple.getID() << '\n';
+
+    // Allocate a Simple dynamically
+    Simple* pSimple{ new Simple{ 2 } };
+
+    std::cout << pSimple->getID() << '\n';
+
+    // We allocated pSimple dynamically, so we have to delete it.
+    delete pSimple;
+
+    return 0;
+} // simple goes out of scope here
+```
+
+## this指针
+
+在下面例子中，会自动将`simple.setID(2);`替换为`setID(&simple, 2);`
+
+而成员函数会被加上`void setID(Simple* const this, int id) { this->m_id = id; }`
+
+因为是自动加上的，所以可以直接使用`this`来获取本实例的指针
+
+```cpp
+#include <iostream>
+class Simple
+{
+private:
+    int m_id;
+
+public:
+    Simple(int id)
+        : m_id{ id }
+    {
+    }
+
+    void setID(int id) { m_id = id; }
+    int getID() { return m_id; }
+};
+
+int main()
+{
+    Simple simple{1};
+    simple.setID(2);
+    std::cout << simple.getID() << '\n';
+
+    return 0;
+}
+```
+
+### 使用this来区分构造器中输入变量的名字和类变量的名字
+
+> 但更倾向于使用m_variablename来进行，因为更简洁
+
+```cpp
+class Something
+{
+private:
+    int data;
+
+public:
+    Something(int data)
+    {
+        this->data = data; // this->data is the member, data is the local parameter
+    }
+};
+```
+
+### 连锁成员函数
+
+`std::cout << "Hello, " << userName;`的`std::cout << "Hello, "` 实际上返回了`*this`，即`(std::cout) << userName;`   因此可以连续使用
+
+例子：
+
+```cpp
+#include <iostream>
+class Calc
+{
+private:
+    int m_value{};
+
+public:
+    Calc& add(int value) { m_value += value; return *this; }
+    Calc& sub(int value) { m_value -= value; return *this; }
+    Calc& mult(int value) { m_value *= value; return *this; }
+
+    int getValue() { return m_value; }
+};
+
+int main()
+{
+    Calc calc{};
+    calc.add(5).sub(3).mult(4);
+
+    std::cout << calc.getValue() << '\n';
+    return 0;
+}
+```
+
+## 常量类
+
++ 常量类初始化后，不能修改成员变量（无论直接还是间接）
++ 常量类只能调用常量成员函数
+
+```cpp
+class Something
+{
+public:
+    int m_value {};
+    Something(): m_value{0} { }
+    void setValue(int value) { m_value = value; }
+    int getValue() { return m_value ; }
+};
+
+int main()
+{
+    const Something something{}; // calls default constructor
+    something.m_value = 5; // compiler error: violates const
+    something.setValue(5); // compiler error: violates const
+    return 0;
+}
+```
+
++ 常量成员函数：加上const关键字，保证不会修改成员变量
+
+  常量成员函数会将其内在的this转为常量指针，因此所有的成员变量均不能修改。
+
+  进一步，**只能返回成员变量的常量引用**
+
+```cpp
+class Something
+{
+public:
+    int m_value {};
+
+    Something(): m_value{0} { }
+
+    void resetValue() { m_value = 0; }
+    void setValue(int value) { m_value = value; }
+
+    int getValue() const { return m_value; } // note addition of const keyword after parameter list, but before function body
+};
+```
+
++ 常量类引用也是一样
+
+```cpp
+class Date
+{
+private:
+    int m_year {};
+    int m_month {};
+    int m_day {};
+
+public:
+    Date(int year, int month, int day)
+    {
+        setDate(year, month, day);
+    }
+
+    // setDate() cannot be const, modifies member variables
+    void setDate(int year, int month, int day)
+    {
+        m_year = year;
+        m_month = month;
+        m_day = day;
+    }
+
+    // The following getters can all be made const
+    int getYear() const { return m_year; }
+    int getMonth() const { return m_month; }
+    int getDay() const { return m_day; }
+};
+```
+
+## 静态
+
+### 静态成员变量
+
++ 静态成员变量由类的所有实例共享
++ 同其他全局静态变量相同，只会在程序结束时销毁
++ 可通过类名或实例获取
++ 静态成员变量定义没有权限控制，即使声明在private，也能进行定义
+
+```cpp
+#include <iostream>
+
+class Something
+{
+public:
+    static int s_value; // declares the static member variable
+};
+
+int Something::s_value{ 1 }; // defines the static member variable (we'll discuss this section below)
+
+int main()
+{
+    // note: we're not instantiating any objects of type Something
+
+    Something::s_value = 2;
+    std::cout << Something::s_value << '\n';
+    return 0;
+}
+```
+
++ 在class中只能进行声明，**必须在外部进行定义和初始化**
+
+  有一些例外：
+
+  ```cpp
+  static const int s_value{ 4 }; // a static const int can be declared and initialized directly
+  static constexpr double s_value{ 2.2 }; // ok
+  static constexpr std::array<int, 3> s_array{ 1, 2, 3 }; // this even works for classes that support constexpr initialization
+  static inline int s_value{ 4 }; // a static inline int can be declared and initialized directly (C++17)
+  ```
+
++ 使用例1（如下）：通过静态成员变量来给每个实例分配ID
+
++ 使用例2：通过静态成员变量来储存临时copy，以防止每次都复制一份
+
+  ```cpp
+  #include <iostream>
+  
+  class Something
+  {
+  private:
+      static inline int s_idGenerator { 1 }; // C++17
+  //  static int s_idGenerator;              // Use this instead for C++14 or older
+      int m_id { };
+  
+  public:
+      Something()
+      : m_id { s_idGenerator++ } // grab the next value from the id generator
+      {}
+  
+      int getID() const { return m_id; }
+  };
+  
+  // For C++14 or older, we have to initialize the non-const static member outside the class definition
+  // Note that we're defining and initializing s_idGenerator even though it is declared as private above.
+  // This is okay since the definition isn't subject to access controls.
+  // int Something::s_idGenerator { 1 }; // start our ID generator with value 1 (uncomment for C++14 or older)
+  
+  int main()
+  {
+      Something first;
+      Something second;
+      Something third;
+  
+      std::cout << first.getID() << '\n';
+      std::cout << second.getID() << '\n';
+      std::cout << third.getID() << '\n';
+      return 0;
+  }
+  ```
+
+### 静态成员函数
+
++ 同静态成员变量一样，在程序结束时销毁，可通过类名获取
++ 没有this指针（因为不绑定实例）
++ 只能够获取到其他的静态变量或静态函数（因为不绑定实例）
++ 也可以定义在class外
+
+```cpp
+#include <iostream>
+
+class IDGenerator
+{
+private:
+    static int s_nextID; // Here's the declaration for a static member
+
+public:
+     static int getNextID(); // Here's the declaration for a static function
+};
+
+// Here's the definition of the static member outside the class.  Note we don't use the static keyword here.
+// We'll start generating IDs at 1
+int IDGenerator::s_nextID{ 1 };
+
+// Here's the definition of the static function outside of the class.  Note we don't use the static keyword here.
+int IDGenerator::getNextID() { return s_nextID++; }
+
+int main()
+{
+    for (int count{ 0 }; count < 5; ++count)
+        std::cout << "The next ID is: " << IDGenerator::getNextID() << '\n';
+
+    return 0;
+}
+```
+
+## 友元函数和类
+
++ 友元函数使用friend关键字，能够获取到指定类的的私有成员
+
+```cpp
+class Accumulator
+{
+private:
+    int m_value { 0 };
+
+public:
+    void add(int value) { m_value += value; }
+
+    // Make the reset() function a friend of this class
+    friend void reset(Accumulator& accumulator);
+};
+
+// reset() is now a friend of the Accumulator class
+void reset(Accumulator& accumulator)
+{
+    // And can access the private data of Accumulator objects
+    accumulator.m_value = 0;
+}
+
+int main()
+{
+    Accumulator acc;
+    acc.add(5); // add 5 to the accumulator
+    reset(acc); // reset the accumulator to 0
+
+    return 0;
+}
+```
+
++ 友元类是一整个类均可获取到指定类的所有私有成员
+
+```cpp
+#include <iostream>
+
+class Storage
+{
+private:
+    int m_nValue {};
+    double m_dValue {};
+public:
+    Storage(int nValue, double dValue)
+       : m_nValue { nValue }, m_dValue { dValue }
+    {
+    }
+
+    // Make the Display class a friend of Storage
+    friend class Display;
+};
+
+class Display
+{
+private:
+    bool m_displayIntFirst;
+
+public:
+    Display(bool displayIntFirst)
+         : m_displayIntFirst { displayIntFirst }
+    {
+    }
+
+    void displayItem(const Storage& storage)
+    {
+        if (m_displayIntFirst)
+            std::cout << storage.m_nValue << ' ' << storage.m_dValue << '\n';
+        else // display double first
+            std::cout << storage.m_dValue << ' ' << storage.m_nValue << '\n';
+    }
+};
+
+int main()
+{
+    Storage storage{5, 6.7};
+    Display display{false};
+
+    display.displayItem(storage);
+
+    return 0;
+}
+```
+
++ 友元成员函数
+
+```cpp
+#include <iostream>
+
+class Storage; // forward declaration for class Storage
+
+class Display
+{
+private:
+	bool m_displayIntFirst {};
+
+public:
+	Display(bool displayIntFirst)
+		: m_displayIntFirst { displayIntFirst }
+	{
+	}
+
+	void displayItem(const Storage& storage); // forward declaration above needed for this declaration line
+};
+
+class Storage // full definition of Storage class
+{
+private:
+	int m_nValue {};
+	double m_dValue {};
+public:
+	Storage(int nValue, double dValue)
+		: m_nValue { nValue }, m_dValue { dValue }
+	{
+	}
+
+	// Make the Display::displayItem member function a friend of the Storage class (requires seeing the full definition of class Display, as above)
+	friend void Display::displayItem(const Storage& storage);
+};
+
+// Now we can define Display::displayItem, which needs to have seen the full definition of class Storage
+void Display::displayItem(const Storage& storage)
+{
+	if (m_displayIntFirst)
+		std::cout << storage.m_nValue << ' ' << storage.m_dValue << '\n';
+	else // display double first
+		std::cout << storage.m_dValue << ' ' << storage.m_nValue << '\n';
+}
+
+int main()
+{
+    Storage storage(5, 6.7);
+    Display display(false);
+
+    display.displayItem(storage);
+
+    return 0;
+}
+```
+
+## 类型转换
+
+### 返回类型转换
+
++ 使用列表初始化返回一个类(line.18)
++ 使用匿名object避免额外空间占用
+
+```cpp
+#include <iostream>
+
+class Cents
+{
+private:
+    int m_cents{};
+
+public:
+    Cents(int cents)
+        : m_cents { cents }
+    {}
+
+    int getCents() const { return m_cents; }
+};
+
+Cents add(const Cents& c1, const Cents& c2)
+{
+    return { c1.getCents() + c2.getCents() }; // return anonymous Cents value
+}
+
+int main()
+{
+    std::cout << "I have " << add(Cents{ 6 }, Cents{ 8 }).getCents() << " cents.\n"; // print anonymous Cents value
+
+    return 0;
+}
+```
+
+## Object关系
+
+![image-20221102153424430](CPP笔记.assets/image-20221102153424430.png)
+
+### Composition
+
+> 比如人的身体和心脏
+
+To qualify as a **composition**, an object and a part must have the following relationship:
+
+- The part (member) is part of the object (class)
+- The part (member) can only belong to one object (class) at a time
+- The part (member) has its existence managed by the object (class)
+- The part (member) does not know about the existence of the object (class)
+- 若Object被清除，member也不复存在
+
+因此若定义了一个包含动态内存分配object的类，该类需要负责此object的内存管理。
+
+有一些例外：
+
+- A composition may defer creation of some parts until they are needed. For example, a string class may not create a dynamic array of characters until the user assigns the string some data to hold.
+- A composition may opt to use a part that has been given to it as input rather than create the part itself.
+- A composition may delegate destruction of its parts to some other object (e.g. to a garbage collection routine).
+
+> A good rule of thumb is that each class should be built to accomplish a single task. That task should either be the storage and manipulation of some kind of data (e.g. Point2D, std::string), OR the coordination of its members (e.g. Creature). Ideally not both.
+
+### Aggregation
+
+To qualify as an **aggregation**, a whole object and its parts must have the following relationship:
+
+- The part (member) is part of the object (class)
+- The part (member) can belong to more than one object (class) at a time
+- The part (member) does *not* have its existence managed by the object (class)
+- The part (member) does not know about the existence of the object (class)
+- Object对member不负责其内存分配和删除
+- 其member一般是所属Object之外的**引用或者指针**
+
+如下是一个教师和其学院的关系，学院被解散后老师依然存在：
+
+```cpp
+#include <iostream>
+#include <string>
+
+class Teacher
+{
+private:
+  std::string m_name{};
+
+public:
+  Teacher(const std::string& name)
+      : m_name{ name }
+  {
+  }
+
+  const std::string& getName() const { return m_name; }
+};
+
+class Department
+{
+private:
+  const Teacher& m_teacher; // This dept holds only one teacher for simplicity, but it could hold many teachers
+
+public:
+  Department(const Teacher& teacher)
+      : m_teacher{ teacher }
+  {
+  }
+};
+
+int main()
+{
+  // Create a teacher outside the scope of the Department
+  Teacher bob{ "Bob" }; // create a teacher
+
+  {
+    // Create a department and use the constructor parameter to pass
+    // the teacher to it.
+    Department department{ bob };
+
+  } // department goes out of scope here and is destroyed
+
+  // bob still exists here, but the department doesn't
+
+  std::cout << bob.getName() << " still exists!\n";
+
+  return 0;
+}
+```
+
+### Association
+
+To qualify as an **association**, an object and another object must have the following relationship:
+
+- The associated object (member) is otherwise unrelated to the object (class)
+- The associated object (member) can belong to more than one object (class) at a time
+- The associated object (member) does *not* have its existence managed by the object (class)
+- The associated object (member) may or may not know about the existence of the object (class)
+
+> 例如医生和病人的关系，一个医生可以有很多病人，一个病人也可以有很多医生，并且两者并不是包含关系。两者之间是“使用”的关系。
+
+```cpp
+#include <functional> // reference_wrapper
+#include <iostream>
+#include <string>
+#include <vector>
+
+// Since Doctor and Patient have a circular dependency, we're going to forward declare Patient
+class Patient;
+
+class Doctor
+{
+private:
+	std::string m_name{};
+	std::vector<std::reference_wrapper<const Patient>> m_patient{};
+
+public:
+	Doctor(const std::string& name) :
+		m_name{ name }
+	{
+	}
+
+	void addPatient(Patient& patient);
+
+	// We'll implement this function below Patient since we need Patient to be defined at that point
+	friend std::ostream& operator<<(std::ostream& out, const Doctor& doctor);
+
+	const std::string& getName() const { return m_name; }
+};
+
+class Patient
+{
+private:
+	std::string m_name{};
+	std::vector<std::reference_wrapper<const Doctor>> m_doctor{}; // so that we can use it here
+
+	// We're going to make addDoctor private because we don't want the public to use it.
+	// They should use Doctor::addPatient() instead, which is publicly exposed
+	void addDoctor(const Doctor& doctor)
+	{
+		m_doctor.push_back(doctor);
+	}
+
+public:
+	Patient(const std::string& name)
+		: m_name{ name }
+	{
+	}
+
+	// We'll implement this function below to parallel operator<<(std::ostream&, const Doctor&)
+	friend std::ostream& operator<<(std::ostream& out, const Patient& patient);
+
+	const std::string& getName() const { return m_name; }
+
+	// We'll friend Doctor::addPatient() so it can access the private function Patient::addDoctor()
+	friend void Doctor::addPatient(Patient& patient);
+};
+
+void Doctor::addPatient(Patient& patient)
+{
+	// Our doctor will add this patient
+	m_patient.push_back(patient);
+
+	// and the patient will also add this doctor
+	patient.addDoctor(*this);
+}
+
+std::ostream& operator<<(std::ostream& out, const Doctor& doctor)
+{
+	if (doctor.m_patient.empty())
+	{
+		out << doctor.m_name << " has no patients right now";
+		return out;
+	}
+
+	out << doctor.m_name << " is seeing patients: ";
+	for (const auto& patient : doctor.m_patient)
+		out << patient.get().getName() << ' ';
+
+	return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const Patient& patient)
+{
+	if (patient.m_doctor.empty())
+	{
+		out << patient.getName() << " has no doctors right now";
+		return out;
+	}
+
+	out << patient.m_name << " is seeing doctors: ";
+	for (const auto& doctor : patient.m_doctor)
+		out << doctor.get().getName() << ' ';
+
+	return out;
+}
+
+int main()
+{
+	// Create a Patient outside the scope of the Doctor
+	Patient dave{ "Dave" };
+	Patient frank{ "Frank" };
+	Patient betsy{ "Betsy" };
+
+	Doctor james{ "James" };
+	Doctor scott{ "Scott" };
+
+	james.addPatient(dave);
+
+	scott.addPatient(dave);
+	scott.addPatient(betsy);
+
+	std::cout << james << '\n';
+	std::cout << scott << '\n';
+	std::cout << dave << '\n';
+	std::cout << frank << '\n';
+	std::cout << betsy << '\n';
+
+	return 0;
+}
+```
+
+### Dependencies
+
++ A **dependency** occurs when one object invokes another object’s functionality in order to accomplish some specific task. 
++ 一般所依赖的是另一个object实例
+
+### Container classes
+
++ Container class管理一系列不同类型的Object
++ 最常用的array和vector
+
+
+
+
+
+
+
+
+
 ## 继承和多态
 
-继承
+### 继承
 
 ```c++
 class MyBaseClass
@@ -2554,6 +4264,210 @@ int main()
 {
 }
 ```
+
++ 初始化一个子类时，首先调用基类构造器，然后调用子类构造器（自上而下）
++ 在销毁一个派生类实例时，析构器的执行顺序与构造器相反（自下而上）
+
+```cpp
+#include <iostream>
+
+class A
+{
+public:
+    A()
+    {
+        std::cout << "A\n";
+    }
+};
+
+class B: public A
+{
+public:
+    B()
+    {
+        std::cout << "B\n";
+    }
+};
+
+class C: public B
+{
+public:
+    C()
+    {
+        std::cout << "C\n";
+    }
+};
+
+class D: public C
+{
+public:
+    D()
+    {
+        std::cout << "D\n";
+    }
+};
+
+int main()
+{
+    std::cout << "Constructing A: \n";
+    A a;
+
+    std::cout << "Constructing B: \n";
+    B b;
+
+    std::cout << "Constructing C: \n";
+    C c;
+
+    std::cout << "Constructing D: \n";
+    D d;
+}
+```
+
++ 在派生类中指定基类构造器（只能是该类的直属父类）
+
+```cpp
+#include <iostream>
+
+class Base
+{
+private: // our member is now private
+    int m_id {};
+
+public:
+    Base(int id=0)
+        : m_id{ id }
+    {
+    }
+
+    int getId() const { return m_id; }
+};
+
+class Derived: public Base
+{
+private: // our member is now private
+    double m_cost;
+
+public:
+    Derived(double cost=0.0, int id=0)
+        : Base{ id } // Call Base(int) constructor with value id!
+        , m_cost{ cost }
+    {
+    }
+
+    double getCost() const { return m_cost; }
+};
+
+int main()
+{
+    Derived derived{ 1.3, 5 }; // use Derived(double, int) constructor
+    std::cout << "Id: " << derived.getId() << '\n';
+    std::cout << "Cost: " << derived.getCost() << '\n';
+
+    return 0;
+}
+```
+
+#### 不同的继承权限
+
+| Access specifier in base class | Access specifier when inherited publicly | Access specifier when inherited privately | Access specifier when inherited protectedly |
+| :----------------------------- | :--------------------------------------- | :---------------------------------------- | :------------------------------------------ |
+| Public                         | Public                                   | Private                                   | Protected                                   |
+| Protected                      | Protected                                | Private                                   | Protected                                   |
+| Private                        | Inaccessible                             | Inaccessible                              | Inaccessible                                |
+
++ 不指定时默认是`private`
++ A class can always access its own (non-inherited) members.
++ The public accesses the members of a class based on the access specifiers of the class it is accessing.
++ A derived class accesses inherited members based on the access specifier inherited from the parent class. This varies depending on the access specifier and type of inheritance used.
+
+```cpp
+// Inherit from Base publicly
+class Pub: public Base
+{
+};
+
+// Inherit from Base protectedly
+class Pro: protected Base
+{
+};
+
+// Inherit from Base privately
+class Pri: private Base
+{
+};
+
+class Def: Base // Defaults to private inheritance
+{
+};
+```
+
+#### **Public inheritance**
+
+> 最常用的继承类型，如无其他原因，最好使用public
+
+![image-20221103115519179](CPP笔记.assets/image-20221103115519179.png)
+
+#### **Protected inheritance**
+
+> 最不常用
+
+![image-20221103115732932](CPP笔记.assets/image-20221103115732932.png)
+
+#### **Private inheritance**
+
++ 只影响通过派生类获取私有成员变量，不影响在派生类中获取基类私有成员
+
+![image-20221103115948957](CPP笔记.assets/image-20221103115948957.png)
+
+```cpp
+class Base
+{
+public:
+    int m_public {};
+protected:
+    int m_protected {};
+private:
+    int m_private {};
+};
+
+class Pri: private Base // note: private inheritance
+{
+    // Private inheritance means:
+    // Public inherited members become private (so m_public is treated as private)
+    // Protected inherited members become private (so m_protected is treated as private)
+    // Private inherited members stay inaccessible (so m_private is inaccessible)
+public:
+    Pri()
+    {
+        m_public = 1; // okay: m_public is now private in Pri
+        m_protected = 2; // okay: m_protected is now private in Pri
+        m_private = 3; // not okay: derived classes can't access private members in the base class
+    }
+};
+
+int main()
+{
+    // Outside access uses the access specifiers of the class being accessed.
+    // In this case, the access specifiers of base.
+    Base base;
+    base.m_public = 1; // okay: m_public is public in Base
+    base.m_protected = 2; // not okay: m_protected is protected in Base
+    base.m_private = 3; // not okay: m_private is private in Base
+
+    Pri pri;
+    pri.m_public = 1; // not okay: m_public is now private in Pri
+    pri.m_protected = 2; // not okay: m_protected is now private in Pri
+    pri.m_private = 3; // not okay: m_private is inaccessible in Pri
+
+    return 0;
+}
+```
+
+
+
+
+
+
 
 多态
 
@@ -2673,27 +4587,256 @@ int main()
 }
 ```
 
-## 使类实例能够像函数一样调用
+## 类方法定义和头文件
 
-```c++
-#include <iostream>
-class MyClass
+### 类方法定义
+
+类方法可以仅在class中定义，在class之外进行声明
+
+```cpp
+class Date
 {
+private:
+    int m_year;
+    int m_month;
+    int m_day;
+
 public:
-    // 需要覆盖这个函数
-    void operator()(int x)
-    {
-        std::cout << "Function object with a parameter " << x << "called.";
-    }
+    Date(int year, int month, int day);
+
+    void SetDate(int year, int month, int day);
+
+    int getYear() { return m_year; }
+    int getMonth() { return m_month; }
+    int getDay()  { return m_day; }
 };
-int main()
+
+// Date constructor
+Date::Date(int year, int month, int day)
 {
-    MyClass myobject;
-    myobject(123); // invoke the function object
+    SetDate(year, month, day);
+}
+
+// Date member function
+void Date::SetDate(int year, int month, int day)
+{
+    m_month = month;
+    m_day = day;
+    m_year = year;
 }
 ```
 
+### 头文件
 
+一般将类定义放入头文件中，将类定义写在`className.cpp`文件中
+
+## Utils
+
+### 重置类变量
+
+> 使用一个新的默认初始化的该类赋值即可
+
+```cpp
+#include <iostream>
+
+class Foo
+{
+private:
+    int m_a{ 5 };
+    int m_b{ 6 };
+
+
+public:
+    Foo()
+    {
+    }
+
+    Foo(int a, int b)
+        : m_a{ a }, m_b{ b }
+    {
+    }
+
+    void print()
+    {
+        std::cout << m_a << ' ' << m_b << '\n';
+    }
+
+    void reset()
+    {
+        // consider this a bit of magic for now
+        *this = Foo(); // create new Foo object, then use assignment to overwrite our implicit object
+    }
+};
+
+int main()
+{
+    Foo a{ 1, 2 };
+    a.reset();
+
+    a.print();
+
+    return 0;
+}
+```
+
+### 类声明
+
+> 和函数一样，类可以先只进行声明，然后定义。这样在这中间过程传入了该类变量时编译器知道有这一个类。
+
+```cpp
+#include <iostream>
+
+class Humidity;
+
+class Temperature
+{
+private:
+    int m_temp {};
+
+public:
+    Temperature(int temp=0)
+        : m_temp { temp }
+    {
+    }
+
+    friend void printWeather(const Temperature& temperature, const Humidity& humidity);
+};
+
+class Humidity
+{
+private:
+    int m_humidity {};
+
+public:
+    Humidity(int humidity=0)
+        : m_humidity { humidity }
+    {
+    }
+
+    friend void printWeather(const Temperature& temperature, const Humidity& humidity);
+};
+
+void printWeather(const Temperature& temperature, const Humidity& humidity)
+{
+    std::cout << "The temperature is " << temperature.m_temp <<
+       " and the humidity is " << humidity.m_humidity << '\n';
+}
+
+int main()
+{
+    Humidity hum{10};
+    Temperature temp{12};
+
+    printWeather(temp, hum);
+
+    return 0;
+}
+```
+
+### 浅拷贝和深拷贝
+
++ 浅拷贝只会进行memberwise copy
++ 下面代码进行浅拷贝会导致两个实例共享一个字符串内存
+
+```cpp
+#include <cstring> // for strlen()
+#include <cassert> // for assert()
+#include <iostream>
+
+class MyString
+{
+private:
+    char* m_data{};
+    int m_length{};
+
+public:
+    MyString(const char* source = "" )
+    {
+        assert(source); // make sure source isn't a null string
+
+        // Find the length of the string
+        // Plus one character for a terminator
+        m_length = std::strlen(source) + 1;
+
+        // Allocate a buffer equal to this length
+        m_data = new char[m_length];
+
+        // Copy the parameter string into our internal buffer
+        for (int i{ 0 }; i < m_length; ++i)
+            m_data[i] = source[i];
+    }
+
+    ~MyString() // destructor
+    {
+        // We need to deallocate our string
+        delete[] m_data;
+    }
+
+    char* getString() { return m_data; }
+    int getLength() { return m_length; }
+};
+
+int main()
+{
+    MyString hello{ "Hello, world!" };
+    {
+        MyString copy{ hello }; // use default copy constructor
+    } // copy is a local variable, so it gets destroyed here.  The destructor deletes copy's string, which leaves hello with a dangling pointer
+
+    std::cout << hello.getString() << '\n'; // this will have undefined behavior
+
+    return 0;
+}
+```
+
++  A **deep copy** allocates memory for the copy and then copies the actual value, so that the copy lives in distinct memory from the source. 
++ 使用时需要重载复制构造器和分配操作符
++ 最好使用标准库的容器以避免浅拷贝（标准库容器已经写好了深拷贝代码）
+
+```cpp
+// assumes m_data is initialized
+void MyString::deepCopy(const MyString& source)
+{
+    // first we need to deallocate any value that this string is holding!
+    delete[] m_data;
+
+    // because m_length is not a pointer, we can shallow copy it
+    m_length = source.m_length;
+
+    // m_data is a pointer, so we need to deep copy it if it is non-null
+    if (source.m_data)
+    {
+        // allocate memory for our copy
+        m_data = new char[m_length];
+
+        // do the copy
+        for (int i{ 0 }; i < m_length; ++i)
+            m_data[i] = source.m_data[i];
+    }
+    else
+        m_data = nullptr;
+}
+
+// Copy constructor
+MyString::MyString(const MyString& source)
+{
+    deepCopy(source);
+}
+
+
+// Assignment operator
+MyString& MyString::operator=(const MyString& source)
+{
+    // check for self-assignment
+    if (this != &source)
+    {
+        // now do the deep copy
+        deepCopy(source);
+    }
+
+    return *this;
+}
+```
 
 
 
@@ -2742,6 +4885,7 @@ To include user-defined header files, we use the #include statement, followed by
 
 + All of your header files should have header guards on them.
 + 用于保证在一个cpp文件中不引入同一个头文件两次以上
++ one-definition rule: 只能定义一次，除了类型定义（包括class）
 
 ```cpp
 #ifndef SQUARE_H
@@ -3150,9 +5294,25 @@ int main(int argc, const char *argv[])
 
 ## 常用
 
-### std::ref
+### 引用
 
-防止默认的值复制，使得其copy的操作永远智能复制其引用
+#### std::ref
+
+防止默认的值复制，使得其copy的操作永远只能复制其引用
+
+#### **std::reference_wrapper**
+
++ reference不能放在标准库list中（因为列表元素必须是assignable）
++ 使用成员函数get()获取元素
+
+```cpp
+#include <functional> // std::reference_wrapper
+
+std::vector<const Teacher&> m_teachers{}; // Illegal
+
+// Vector of const references to std::string
+std::vector<std::reference_wrapper<const std::string>> names{ tom, berta };
+```
 
 ### 程序退出
 
@@ -3241,7 +5401,58 @@ int main()
 
 通常和exceptions结合使用，默认调用std::abort()
 
+### 计时
 
++ 使用chrono计时，m_beg为当前时间
+
+```cpp
+#include <algorithm> // for std::sort
+#include <array>
+#include <chrono> // for std::chrono functions
+#include <cstddef> // for std::size_t
+#include <iostream>
+#include <numeric> // for std::iota
+
+const int g_arrayElements { 10000 };
+
+class Timer
+{
+private:
+    // Type aliases to make accessing nested type easier
+    using Clock = std::chrono::steady_clock;
+    using Second = std::chrono::duration<double, std::ratio<1> >;
+
+    std::chrono::time_point<Clock> m_beg{ Clock::now() };
+
+public:
+
+    void reset()
+    {
+        m_beg = Clock::now();
+    }
+
+    double elapsed() const
+    {
+        return std::chrono::duration_cast<Second>(Clock::now() - m_beg).count();
+    }
+};
+
+int main()
+{
+    std::array<int, g_arrayElements> array;
+    std::iota(array.rbegin(), array.rend(), 1); // fill the array with values 10000 to 1
+
+    Timer t;
+
+    std::ranges::sort(array); // Since C++20
+    // If your compiler isn't C++20-capable
+    // std::sort(array.begin(), array.end());
+
+    std::cout << "Time taken: " << t.elapsed() << " seconds\n";
+
+    return 0;
+}
+```
 
 
 
