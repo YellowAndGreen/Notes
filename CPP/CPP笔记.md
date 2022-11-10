@@ -686,16 +686,41 @@ int main()
 }
 ```
 
-### 聪明指针
+### Smart pointer
 
 > Smart pointers are pointers that own the object they point to and automatically destroy
 > the object they point to and deallocate the memory once the pointers go out of scope.
 
 #### unique指针
 
-> A unique pointer called std::unique_ptr is a pointer that owns an object it points
-> to. The pointer **can not be copied**. Unique pointer deletes the object and deallocates
-> memory for it, once it goes out of scope.
+> A unique pointer called std::unique_ptr is a pointer that owns an object it points to. 
+
++ `std::unique_ptr`设计为使用`move semantics`，因此不能使用`copy initialization`和`copy assignment`，因此**只能使用std::move来移动值**
++ Unique pointer deletes the object and deallocates memory for it, once it goes out of scope.
++ Unique pointer可以被转换成布尔值来判断该指针是否存在指向的对象
++ 可以直接通过值返回unique指针：`return std::make_unique<Resource>();`
+
+ In C++14 or earlier, move semantics will be employed to transfer the Resource from the return value to the object assigned to (in the above example, ptr), and **in C++17 or newer, the return will be elided.(不懂)** 
+
++ 使用get()获取对象的原始指针：`ptr.get()`
+
++ 作为函数参数最好用引用或者指针，因为move会丢失控制
+
++ :skull:不要用多个unique指针管理相同object：
+
+  ```cpp
+  Resource* res{ new Resource() };
+  std::unique_ptr<Resource> res1{ res };
+  std::unique_ptr<Resource> res2{ res };
+  ```
+
++ :skull:不要手动删除unique指针管理的对象：
+
+```cpp
+Resource* res{ new Resource() };
+std::unique_ptr<Resource> res1{ res };
+delete res;
+```
 
 使用方式：
 
@@ -704,8 +729,9 @@ int main()
 #include <memory>    // 需要用到memory
 int main()
 {
-std::unique_ptr<int> p(new int{ 123 });
-std::cout << *p;
+	std::unique_ptr<int> p(new int{ 123 });
+	if (p) // use implicit cast to bool to ensure res contains a Resource
+		std::cout << *p << '\n'; // print the Resource that res is owning
 }
 ```
 
@@ -751,7 +777,13 @@ p->printmessage();
 >
 > 多个指针指向同一个对象，只有最后一个指针的scope结束时，才会在内存中删除对象
 
-初始化共享指针并复制
++ C++14中引入std::make_shared() ，同std::make_unique()一致
+
+```cpp
+std::make_shared<Resource>(a, b, c)
+```
+
++ 初始化共享指针并复制（必须是复制共享指针而不是原始指针）
 
 ```c++
 #include <iostream>
@@ -763,6 +795,90 @@ std::shared_ptr<int> p2 = p1;
 std::shared_ptr<int> p3 = p1;
 }
 ```
+
++ 多个共享指针以相同原始指针初始化会崩溃：
+
+```cpp
+#include <iostream>
+#include <memory> // for std::shared_ptr
+
+class Resource
+{
+public:
+	Resource() { std::cout << "Resource acquired\n"; }
+	~Resource() { std::cout << "Resource destroyed\n"; }
+};
+
+int main()
+{
+	Resource* res { new Resource };
+	std::shared_ptr<Resource> ptr1 { res };
+	{
+		std::shared_ptr<Resource> ptr2 { res }; // create ptr2 directly from res (instead of ptr1)
+
+		std::cout << "Killing one shared pointer\n";
+	} // ptr2 goes out of scope here, and the allocated Resource is destroyed
+
+	std::cout << "Killing another shared pointer\n";
+
+	return 0;
+} // ptr1 goes out of scope here, and the allocated Resource is destroyed again
+```
+
+#### **std::weak_ptr**
+
++ 用来解决循环引用的问题：weak指针只能够获取到object，但并不能控制object的scope。因此共享指针的scope不会考虑weak指针，在所有共享指针都out of scope后object会正确的销毁。
+
+```cpp
+#include <iostream>
+#include <memory> // for std::shared_ptr and std::weak_ptr
+#include <string>
+
+class Person
+{
+	std::string m_name;
+	std::weak_ptr<Person> m_partner; // note: This is now a std::weak_ptr
+
+public:
+
+	Person(const std::string &name): m_name(name)
+	{
+		std::cout << m_name << " created\n";
+	}
+	~Person()
+	{
+		std::cout << m_name << " destroyed\n";
+	}
+
+	friend bool partnerUp(std::shared_ptr<Person> &p1, std::shared_ptr<Person> &p2)
+	{
+		if (!p1 || !p2)
+			return false;
+
+		p1->m_partner = p2;
+		p2->m_partner = p1;
+
+		std::cout << p1->m_name << " is now partnered with " << p2->m_name << '\n';
+
+		return true;
+	}
+};
+
+int main()
+{
+	auto lucy { std::make_shared<Person>("Lucy") };
+	auto ricky { std::make_shared<Person>("Ricky") };
+
+	partnerUp(lucy, ricky);
+
+	return 0;
+}
+```
+
++ weak指针不能直接使用(they have no operator->)，因此需要首先将其转化为`std::shared_ptr`
++ To convert a std::weak_ptr into a std::shared_ptr, you can use the lock() member function. 
+
+
 
 ### 修改函数参数中的指针
 
@@ -832,33 +948,6 @@ std::cout << *intPtr << '\n'; // then we can dereference the result
 ```
 
 
-
-
-
-## lvalue引用
-
-> <type>\&表示引用类型，一般紧跟在类型之后，但放在变量名之前也可
-
-+ 所有的引用都必须初始化
-+ 引用类型必须和被引用的类型一致
-+ 引用类型不能重新指向其他lvalue
-+ **引用常量，字面量或者临时变量必须在类型前加上const**  `const int& ref { x };`
-+ 常量引用可以通过rvalue初始化  `const int& ref { 5 }; // okay: 5 is an rvalue`
-+ **临时变量是rvalue，执行后就被丢弃了**
-
-```c++
-int x = 123;
-int& p1 = x;
-int p2 = x;
-// 引用和原变量的指针相同，直接赋值指针不同
-std::cout << &x <<"\n" << &p1 << "\n" << &p2;
-
-const int y { 5 };
-int& invalidRef { y };  // invalid: can't bind to a non-modifiable lvalue
-int& invalidRef2 { 0 }; // invalid: can't bind to an r-value
-```
-
-+ 使用常量引用 非常量lvalue时，起常量引用不能修改值
 
 ## 生命周期
 
@@ -1007,10 +1096,16 @@ int main()
 
 ## Lvalue and rvalue
 
-1. lvalues expressions are those that evaluate to variables or other identifiable objects that persist beyond the end of the expression.
-2. rvalues expressions are those that evaluate to literals or the returned value of functions and operators that are discarded at the end of the expression.
+| L-value reference       | Can be initialized with | Can modify |
+| :---------------------- | :---------------------- | :--------- |
+| Modifiable l-values     | Yes                     | Yes        |
+| Non-modifiable l-values | No                      | No         |
+| R-values                | No                      | No         |
 
-+ rvalue可理解为临时变量
+1. lvalues expressions are those that evaluate to variables or other identifiable objects that persist beyond the end of the expression.
+2. rvalues expressions are those that evaluate to **literals** or the returned value of functions and operators that are discarded at the end of the expression.
+
+3. rvalue可理解为临时变量
 
 ```cpp
 int main()
@@ -1022,6 +1117,117 @@ int main()
     5 = x; // error: 5 is an rvalue expression and x is a modifiable lvalue expression
 
     return 0;
+}
+```
+
+### lvalue引用
+
+> <type>\&表示引用类型，一般紧跟在类型之后，但放在变量名之前也可
+
++ 所有的引用都必须初始化
++ 引用类型必须和被引用的类型一致
++ 引用类型不能重新指向其他lvalue
++ **临时变量是rvalue，执行后就被丢弃了**
+
+```c++
+int x = 123;
+int& p1 = x;
+int p2 = x;
+// 引用和原变量的指针相同，直接赋值指针不同
+std::cout << &x <<"\n" << &p1 << "\n" << &p2;
+
+const int y { 5 };
+int& invalidRef { y };  // invalid: can't bind to a non-modifiable lvalue
+int& invalidRef2 { 0 }; // invalid: can't bind to an r-value
+```
+
++ 使用常量引用 非常量lvalue时，起常量引用不能修改值
+
+### 常量左值引用
+
++ 可以用来接受字面量（作为函数参数）
++ **引用常量，字面量或者临时变量必须在类型前加上const**  `const int& ref { x };`
++ 常量引用可以通过rvalue初始化 `const int& ref { 5 }; // okay: 5 is an rvalue`
+
+| L-value reference to const | Can be initialized with | Can modify |
+| :------------------------- | :---------------------- | :--------- |
+| Modifiable l-values        | Yes                     | No         |
+| Non-modifiable l-values    | Yes                     | No         |
+| R-values                   | Yes                     | No         |
+
+### rvalue引用
+
+| R-value reference       | Can be initialized with | Can modify |
+| :---------------------- | :---------------------- | :--------- |
+| Modifiable l-values     | No                      | No         |
+| Non-modifiable l-values | No                      | No         |
+| R-values                | Yes                     | Yes        |
+
+| R-value reference to const | Can be initialized with | Can modify |
+| :------------------------- | :---------------------- | :--------- |
+| Modifiable l-values        | No                      | No         |
+| Non-modifiable l-values    | No                      | No         |
+| R-values                   | Yes                     | No         |
+
++ 使用两个&&表明右值引用
+
+```cpp
+#include <iostream>
+
+class Fraction
+{
+private:
+	int m_numerator;
+	int m_denominator;
+
+public:
+	Fraction(int numerator = 0, int denominator = 1) :
+		m_numerator{ numerator }, m_denominator{ denominator }
+	{
+	}
+
+	friend std::ostream& operator<<(std::ostream& out, const Fraction &f1)
+	{
+		out << f1.m_numerator << '/' << f1.m_denominator;
+		return out;
+	}
+};
+
+int main()
+{
+	auto &&rref{ Fraction{ 3, 5 } }; // r-value reference to temporary Fraction
+
+	// f1 of operator<< binds to the temporary, no copies are created.
+	std::cout << rref << '\n';
+
+	return 0;
+} // rref (and the temporary Fraction) goes out of scope here
+```
+
++ rvalue常作为函数参数来定义对于lvalue和rvalue的不同处理方式
+
+```cpp
+#include <iostream>
+
+void fun(const int &lref) // l-value arguments will select this function
+{
+	std::cout << "l-value reference to const\n";
+}
+
+void fun(int &&rref) // r-value arguments will select this function
+{
+	std::cout << "r-value reference\n";
+}
+
+int main()
+{
+	int x{ 5 };
+	fun(x); // l-value argument calls l-value version of function
+	fun(5); // r-value argument calls r-value version of function
+    // 有名字的Object会被认为时lvalue，因此调用fun(const int &lref)
+    int &&ref{ 5 };
+    fun(ref);
+	return 0;
 }
 ```
 
@@ -2577,6 +2783,58 @@ int main()
 }
 ```
 
+## 有继承的输出重载
+
++ 由于友元函数不能被虚拟化，因此需要一个额外的成员函数来完成输出任务
+
+```cpp
+#include <iostream>
+
+class Base
+{
+public:
+	// Here's our overloaded operator<<
+	friend std::ostream& operator<<(std::ostream& out, const Base& b)
+	{
+		// Delegate printing responsibility for printing to member function print()
+		return b.print(out);
+	}
+
+	// We'll rely on member function print() to do the actual printing
+	// Because print is a normal member function, it can be virtualized
+	virtual std::ostream& print(std::ostream& out) const
+	{
+		out << "Base";
+		return out;
+	}
+};
+
+class Derived : public Base
+{
+public:
+	// Here's our override print function to handle the Derived case
+	std::ostream& print(std::ostream& out) const override
+	{
+		out << "Derived";
+		return out;
+	}
+};
+
+int main()
+{
+	Base b{};
+	std::cout << b << '\n';
+
+	Derived d{};
+	std::cout << d << '\n'; // note that this works even with no operator<< that explicitly handles Derived objects
+
+	Base& bref{ d };
+	std::cout << bref << '\n';
+
+	return 0;
+}
+```
+
 ## 下标操作符
 
 + 以引用返回，因为是lvalue，所以可以进行赋值
@@ -3281,6 +3539,7 @@ Fraction fCopy { fiveThirds }; // Brace initialize a Fraction -- with copy const
 + 复制构造器默认存在，可以自行定义，是member-wise初始化
 + 若不想该类使用复制构造器，可以将其放入private中
 + 复制构造器可能被编译器忽略（直接使用参数初始化）：`Fraction fiveThirds { Fraction { 5, 3 } };`
++ **默认构造器只能进行浅拷贝**(对于指针只能拷贝其地址而不是新建一份object)
 
 ```cpp
 #include <cassert>
@@ -3326,11 +3585,7 @@ int main()
 }
 ```
 
-
-
-默认构造器只能进行浅拷贝
-
-自定义复制构造器
++ 自定义复制构造器
 
 ```c++
 #include <iostream>
@@ -4379,6 +4634,7 @@ int main()
 + A class can always access its own (non-inherited) members.
 + The public accesses the members of a class based on the access specifiers of the class it is accessing.
 + A derived class accesses inherited members based on the access specifier inherited from the parent class. This varies depending on the access specifier and type of inheritance used.
++ 继承后的对于父类成员的权限可以看作本类的权限（对于本类的子类，除了Inaccessible的成员）
 
 ```cpp
 // Inherit from Base publicly
@@ -4401,19 +4657,19 @@ class Def: Base // Defaults to private inheritance
 };
 ```
 
-#### **Public inheritance**
+##### **Public inheritance**
 
 > 最常用的继承类型，如无其他原因，最好使用public
 
 ![image-20221103115519179](CPP笔记.assets/image-20221103115519179.png)
 
-#### **Protected inheritance**
+##### **Protected inheritance**
 
 > 最不常用
 
 ![image-20221103115732932](CPP笔记.assets/image-20221103115732932.png)
 
-#### **Private inheritance**
+##### **Private inheritance**
 
 + 只影响通过派生类获取私有成员变量，不影响在派生类中获取基类私有成员
 
@@ -4463,129 +4719,888 @@ int main()
 }
 ```
 
+#### 覆盖父类方法
 
++ 可以在子类中直接重新定义
++ 可以在重新定义的方法中再调用父类方法
 
-
-
-
-
-多态
-
-```c++
+```cpp
 #include <iostream>
-class MyBaseClass
+
+class Derived: public Base
 {
 public:
-    virtual void dowork()
+    Derived(int value)
+        : Base { value }
     {
-        std::cout << "Hello from a base class." << '\n';
+    }
+
+    int getValue() const  { return m_value; }
+    void identify() const
+    {
+        Base::identify(); // call Base::identify() first
+        std::cout << "I am a Derived\n"; // then identify ourselves
     }
 };
-class MyDerivedClass : public MyBaseClass
-{
-public:
-    void dowork() override
-    {
-        std::cout << "Hello from a derived class." << '\n';
-    }
-};
+
 int main()
 {
-    MyBaseClass* o = new MyDerivedClass;
-    o->dowork();
-    delete o;
+    Base base { 5 };
+    base.identify();
+    Derived derived { 7 };
+    derived.identify();
+    return 0;
 }
 ```
 
-### 抽象类
+#### 调用父类的友元函数
 
-抽象类有至少一个抽象方法（纯虚拟函数）
++ 需要将子类显式类型转换为父类才能调用
 
-```c++
+```cpp
 #include <iostream>
-class MyAbstractClass
+
+class Base
 {
-public:
-    virtual void dowork() = 0;
-};
-class MyDerivedClass : public MyAbstractClass
-{
-public:
-    void dowork()
-    {
-        std::cout << "Hello from a derived class." << '\n';
-    }
-};
-int main()
-{
-    MyAbstractClass* o = new MyDerivedClass;
-    o->dowork();
-    delete o;
-}
-```
-
-### 基类必须有一个虚拟destructor
-
-This ensures the proper deallocation of objects accessed through a base class pointer via the inheritance chain:
-
-```c++
-class MyBaseClass
-{
-public:
-    virtual void dowork() = 0;
-    virtual ~MyBaseClass() {};
-};
-```
-
-
-
-## 泛型
-
-1. 定义：`template <typename T>`或`template <class T>`，两者效果一样。
-
-```c++
-#include <iostream>
-template <typename T>
-// 也可同时定义两个参数的泛型
-// template <typename T, typename U>
-void myfunction(T param)
-{
-    std::cout << "The value of a parameter is: " << param;
-}
-int main()
-{
-    myfunction<int>(123);
-    myfunction<double>(123.456);
-    myfunction<char>('A');
-}
-```
-
-泛型作为类变量：
-
-```c++
-#include <iostream>
-template <typename T>  // 同template <class T> 
-class MyClass {
 private:
-    T x;
+	int m_value {};
+
 public:
-    explicit MyClass(T xx)
-            :x{ xx }
-    {
-    }
-    T getvalue()
-    {
-        return x;
-    }
+	Base(int value)
+		: m_value{ value }
+	{
+	}
+
+	friend std::ostream& operator<< (std::ostream& out, const Base& b)
+	{
+		out << "In Base\n";
+		out << b.m_value << '\n';
+		return out;
+	}
 };
+
+class Derived : public Base
+{
+public:
+	Derived(int value)
+		: Base{ value }
+	{
+	}
+
+	friend std::ostream& operator<< (std::ostream& out, const Derived& d)
+	{
+		out << "In Derived\n";
+		// static_cast Derived to a Base object, so we call the right version of operator<<
+		out << static_cast<const Base&>(d);
+		return out;
+	}
+};
+
 int main()
 {
-    MyClass<int> o{ 123 };
-    std::cout << "The value of x is: " << o.getvalue() << '\n';
-    MyClass<double> o2{ 456.789 };
-    std::cout << "The value of x is: " << o2.getvalue() << '\n';
+	Derived derived { 7 };
+
+	std::cout << derived << '\n';
+
+	return 0;
 }
 ```
+
+#### 修改继承的成员权限
+
++ 必须是子类能够access到的成员
++ 在对应的access的scope中使用`using Base::printValue;`c重新声明即可
+
+```cpp
+#include <iostream>
+
+class Base
+{
+private:
+    int m_value {};
+
+public:
+    Base(int value)
+        : m_value { value }
+    {
+    }
+
+protected:
+    void printValue() const { std::cout << m_value; }
+};
+
+class Derived: public Base
+{
+public:
+    Derived(int value)
+        : Base { value }
+    {
+    }
+
+    // Base::printValue was inherited as protected, so the public has no access
+    // But we're changing it to public via a using declaration
+    using Base::printValue; // note: no parenthesis here
+};
+
+int main()
+{
+    Derived derived { 7 };
+
+    // printValue is public in Derived, so this is okay
+    derived.printValue(); // prints 7
+    return 0;
+}
+```
+
+#### 多重继承
+
+```cpp
+#include <string>
+#include <string_view>
+
+class Person
+{
+private:
+    std::string m_name;
+    int m_age{};
+
+public:
+    Person(std::string_view name, int age)
+        : m_name{ name }, m_age{ age }
+    {
+    }
+
+    const std::string& getName() const { return m_name; }
+    int getAge() const { return m_age; }
+};
+
+class Employee
+{
+private:
+    std::string m_employer;
+    double m_wage{};
+
+public:
+    Employee(std::string_view employer, double wage)
+        : m_employer{ employer }, m_wage{ wage }
+    {
+    }
+
+    const std::string& getEmployer() const { return m_employer; }
+    double getWage() const { return m_wage; }
+};
+
+// Teacher publicly inherits Person and Employee
+class Teacher : public Person, public Employee
+{
+private:
+    int m_teachesGrade{};
+
+public:
+    Teacher(std::string_view name, int age, std::string_view employer, double wage, int teachesGrade)
+        : Person{ name, age }, Employee{ employer, wage }, m_teachesGrade{ teachesGrade }
+    {
+    }
+};
+
+int main()
+{
+    Teacher t{ "Mary", 45, "Boo", 14.3, 8 };
+
+    return 0;
+}
+```
+
+#### 派生类的指针和引用
+
+1. 派生类引用和指针可以转化为基类的引用和指针，但只能访问到基类的成员变量
+
+2. 使用虚函数可以解决不能访问到派生类成员的问题
+
+   ```cpp
+   #include <iostream>
+   #include <string_view>
+   
+   class Base
+   {
+   protected:
+       int m_value {};
+   
+   public:
+       Base(int value)
+           : m_value{ value }
+       {
+       }
+   
+       std::string_view getName() const { return "Base"; }
+       int getValue() const { return m_value; }
+   };
+   
+   class Derived: public Base
+   {
+   public:
+       Derived(int value)
+           : Base{ value }
+       {
+       }
+   
+       std::string_view getName() const { return "Derived"; }
+       int getValueDoubled() const { return m_value * 2; }
+   };
+   
+   int main()
+   {
+       Derived derived{ 5 };
+   
+       // These are both legal!
+       Base& rBase{ derived };
+       Base* pBase{ &derived };
+   
+       std::cout << "derived is a " << derived.getName() << " and has value " << derived.getValue() << '\n';
+       std::cout << "rBase is a " << rBase.getName() << " and has value " << rBase.getValue() << '\n';
+       std::cout << "pBase is a " << pBase->getName() << " and has value " << pBase->getValue() << '\n';
+   
+       return 0;
+   }
+   ```
+
+#### dynamic_cast
+
+> 动态转换和静态转换的区别是静态转换不会进行类型检查，直接进行类型转换，而动态转换若不符合会返回空指针。
+
++ 使用方式同static_cast相同
+
++ 若转换失败，会返回空指针，因此需要进行检验
+
++ 对于引用也是同理，但是由于没有空引用，因此转换失败会抛出std::bad_cast的错误
+
+  ```cpp
+  int main()
+  {
+  	Base* b{ getObject(true) };
+  
+  	Derived* d{ dynamic_cast<Derived*>(b) }; // use dynamic cast to convert Base pointer into Derived pointer
+  
+  	if (d) // make sure d is non-null
+  		std::cout << "The name of the Derived is: " << d->getName() << '\n';
+  
+  	delete b;
+  
+  	return 0;
+  }
+  ```
+
+Also note that there are several cases where downcasting using dynamic_cast will not work:
+
+1. With protected or private inheritance.
+2. For classes that do not declare or inherit any virtual functions (and thus don’t have a virtual table).
+
+#### object slicing
+
++ 直接将一个派生类赋值给基类变量会导致只有基类的部分被copy给基类变量
+
+```cpp
+int main()
+{
+    Derived derived{ 5 };
+    Base base{ derived }; // what happens here?
+    std::cout << "base is a " << base.getName() << " and has value " << base.getValue() << '\n';
+
+    return 0;
+}
+```
+
+### 多态
+
+#### 虚函数
+
++ 虚函数定义在基类和派生类之间，调用时会自动搜寻最接近派生类的虚函数（从基类到派生类）
++ 若不是虚函数，则不会去搜寻
++ 虚函数必须类型，参数和返回类型完全一致才能匹配
++ Never call virtual functions from constructors or destructors.
+
+```cpp
+#include <iostream>
+#include <string_view>
+
+class A
+{
+public:
+    virtual std::string_view getName() const { return "A"; }
+};
+
+class B: public A
+{
+public:
+    virtual std::string_view getName() const { return "B"; }
+};
+
+class C: public B
+{
+public:
+    virtual std::string_view getName() const { return "C"; }
+};
+
+class D: public C
+{
+public:
+    virtual std::string_view getName() const { return "D"; }
+};
+
+int main()
+{
+    C c;
+    A& rBase{ c };
+    std::cout << "rBase is a " << rBase.getName() << '\n';
+	// rBase is a C
+    return 0;
+}
+```
+
++ 若基类的方法有virtual，则其派生类的相同函数会被视作override基类方法，因此是隐式virtual
+
+  ```cpp
+  #include <iostream>
+  #include <string_view>
+  
+  class A
+  {
+  public:
+      virtual std::string_view getName() const { return "A"; }
+  };
+  
+  class B: public A
+  {
+  public:
+      // note: no virtual keyword in B, C, and D
+      std::string_view getName() const { return "B"; }
+  };
+  
+  class C: public B
+  {
+  public:
+      std::string_view getName() const { return "C"; }
+  };
+  
+  class D: public C
+  {
+  public:
+      std::string_view getName() const { return "D"; }
+  };
+  
+  int main()
+  {
+      C c;
+      B& rBase{ c }; // note: rBase is a B this time
+      std::cout << rBase.getName() << '\n';
+  	// 输出C
+      return 0;
+  }
+  ```
+
+#### override
+
++ 将override放在最后以表示覆盖基类方法
+
+> **在基类的虚拟函数使用virtual，在派生类中覆盖父类虚拟函数的方法后加上override**(不需要加virture，覆盖后是隐式的虚拟函数)。
+
+```cpp
+#include <string_view>
+
+class A
+{
+public:
+	virtual std::string_view getName1(int x) { return "A"; }
+	virtual std::string_view getName2(int x) { return "A"; }
+	virtual std::string_view getName3(int x) { return "A"; }
+};
+
+class B : public A
+{
+public:
+	std::string_view getName1(short int x) override { return "B"; } // compile error, function is not an override
+	std::string_view getName2(int x) const override { return "B"; } // compile error, function is not an override
+	std::string_view getName3(int x) override { return "B"; } // okay, function is an override of A::getName3(int)
+
+};
+
+int main()
+{
+	return 0;
+}
+```
+
+#### final
+
++ 用于禁止方法被覆盖
+
+```cpp
+#include <string_view>
+
+class A
+{
+public:
+	virtual std::string_view getName() { return "A"; }
+};
+
+class B : public A
+{
+public:
+	// note use of final specifier on following line -- that makes this function no longer overridable
+	std::string_view getName() override final { return "B"; } // okay, overrides A::getName()
+};
+
+class C : public B
+{
+public:
+	std::string_view getName() override { return "C"; } // compile error: overrides B::getName(), which is final
+};
+```
+
++ 也可以防止类被继承
+
+```cpp
+#include <string_view>
+
+class A
+{
+public:
+	virtual std::string_view getName() { return "A"; }
+};
+
+class B final : public A // note use of final specifier here
+{
+public:
+	std::string_view getName() override { return "B"; }
+};
+
+class C : public B // compile error: cannot inherit from final class
+{
+public:
+	std::string_view getName() override { return "C"; }
+};
+```
+
+#### 虚拟析构器
+
++ 有继承的情况下，应该使用虚拟析构器
++ 若基类不需要，则可以定义：`virtual ~Base() = default; // generate a virtual default destructor`
+
+在下面例子中，Derived被转为了Base类指针，但清理时只能使用到Base的析构器，因此编译失败
+
+```cpp
+#include <iostream>
+class Base
+{
+public:
+    ~Base() // note: not virtual
+    {
+        std::cout << "Calling ~Base()\n";
+    }
+};
+
+class Derived: public Base
+{
+private:
+    int* m_array;
+
+public:
+    Derived(int length)
+      : m_array{ new int[length] }
+    {
+    }
+
+    ~Derived() // note: not virtual (your compiler may warn you about this)
+    {
+        std::cout << "Calling ~Derived()\n";
+        delete[] m_array;
+    }
+};
+
+int main()
+{
+    Derived* derived { new Derived(5) };
+    Base* base { derived };
+
+    delete base;
+
+    return 0;
+}
+```
+
+#### 忽略虚拟
+
++ 可以使用scope来使用指定的虚函数（而不是继续匹配）：`base.Base::getName()`
+
+```cpp
+#include <iostream>
+
+class Base
+{
+public:
+    virtual ~Base() = default;
+    virtual const char* getName() const { return "Base"; }
+};
+
+class Derived: public Base
+{
+public:
+    virtual const char* getName() const { return "Derived"; }
+};
+
+int main()
+{
+    Derived derived;
+    const Base& base { derived };
+    // Calls Base::getName() instead of the virtualized Derived::getName()
+    std::cout << base.Base::getName() << '\n';
+
+    return 0;
+}
+```
+
+### 纯虚函数
+
++ 也叫抽象函数
++ A pure virtual function simply acts as a placeholder that is meant to be redefined by derived classes.
++ To create a pure virtual function, rather than define a body for the function, we simply assign the function the value 0.
+
+```cpp
+class Base
+{
+public:
+    const char* sayHi() const { return "Hi"; } // a normal non-virtual function
+
+    virtual const char* getName() const { return "Base"; } // a normal virtual function
+
+    virtual int getValue() const = 0; // a pure virtual function
+
+    int doSomething() = 0; // Compile error: can not set non-virtual functions to 0
+};
+```
+
++ **使用了纯虚函数的类会成为抽象基类，而抽象基类不能被初始化**
++ 继承了抽象类的派生类必须定义纯虚函数，否则也会被当作抽象类
+
+```cpp
+#include <iostream>
+#include <string>
+
+class Animal // This Animal is an abstract base class
+{
+protected:
+    std::string m_name;
+
+public:
+    Animal(const std::string& name)
+        : m_name{ name }
+    {
+    }
+
+    const std::string& getName() const { return m_name; }
+    virtual const char* speak() const = 0; // note that speak is now a pure virtual function
+
+    virtual ~Animal() = default;
+};
+
+class Cow: public Animal
+{
+public:
+    Cow(const std::string& name)
+        : Animal(name)
+    {
+    }
+
+    const char* speak() const override { return "Moo"; }
+};
+
+int main()
+{
+    Cow cow{ "Betsy" };
+    std::cout << cow.getName() << " says " << cow.speak() << '\n';
+
+    return 0;
+}
+```
+
+### 接口类
+
++ **Interface classes**没有成员变量，且所有的成员函数都是纯虚函数
++ 用于确保派生类必须实现某些功能
++ 通常以I开头命名
+
+```cpp
+class IErrorLog
+{
+public:
+    virtual bool openLog(const char* filename) = 0;
+    virtual bool closeLog() = 0;
+
+    virtual bool writeError(const char* errorMessage) = 0;
+
+    virtual ~IErrorLog() {} // make a virtual destructor in case we delete an IErrorLog pointer, so the proper derived destructor is called
+};
+```
+
+### 虚拟基类
+
++ To share a base class, simply insert the “virtual” keyword in the inheritance list of the derived class.
++ 被共享的基类（虚拟基类）只会construct一次
++ 最深层次的派生类负责construct虚拟基类
+
+```cpp
+class PoweredDevice
+{
+};
+
+class Scanner: virtual public PoweredDevice
+{
+};
+
+class Printer: virtual public PoweredDevice
+{
+};
+
+class Copier: public Scanner, public Printer
+{
+};
+```
+
+
+
+## 泛型（模板类）
+
+1. 定义：`template <typename T>`或`template <class T>`，两者效果一样
+2. 模板类的只能定义在类之外，且必须和类定义在一个文件
+
+```c++
+#ifndef ARRAY_H
+#define ARRAY_H
+
+#include <cassert>
+
+template <typename T> // added
+class Array
+{
+private:
+    int m_length{};
+    T* m_data{}; // changed type to T
+
+public:
+
+    Array(int length)
+    {
+        assert(length > 0);
+        m_data = new T[length]{}; // allocated an array of objects of type T
+        m_length = length;
+    }
+
+    Array(const Array&) = delete;
+    Array& operator=(const Array&) = delete;
+
+    ~Array()
+    {
+        delete[] m_data;
+    }
+
+    void erase()
+    {
+        delete[] m_data;
+        // We need to make sure we set m_data to 0 here, otherwise it will
+        // be left pointing at deallocated memory!
+        m_data = nullptr;
+        m_length = 0;
+    }
+
+    T& operator[](int index) // now returns a T&
+    {
+        assert(index >= 0 && index < m_length);
+        return m_data[index];
+    }
+
+    // templated getLength() function defined below
+    int getLength() const;
+};
+
+// member functions defined outside the class need their own template declaration
+template <typename T>
+int Array<T>::getLength() const // note class name is Array<T>, not Array
+{
+  return m_length;
+}
+
+#endif
+```
+
+使用：
+
+```cpp
+#include <iostream>
+#include "Array.h"
+
+int main()
+{
+	Array<int> intArray { 12 };
+	Array<double> doubleArray { 12 };
+
+	for (int count{ 0 }; count < intArray.getLength(); ++count)
+	{
+		intArray[count] = count;
+		doubleArray[count] = count + 0.5;
+	}
+
+	for (int count{ intArray.getLength() - 1 }; count >= 0; --count)
+		std::cout << intArray[count] << '\t' << doubleArray[count] << '\n';
+
+	return 0;
+}
+```
+
+### non-type parameters
+
+模板参数的非类型参数是预定义的，且必须是`constexpr`
+
+A non-type parameter can be any of the following types:
+
+- An integral type
+- An enumeration type
+- A pointer or reference to a class object
+- A pointer or reference to a function
+- A pointer or reference to a class member function
+- std::nullptr_t
+- A floating point type (since C++20)
+
+例：用整型变量初始化数组长度
+
+```cpp
+#include <iostream>
+
+template <typename T, int size> // size is an integral non-type parameter
+class StaticArray
+{
+private:
+    // The non-type parameter controls the size of the array
+    T m_array[size] {};
+
+public:
+    T* getArray();
+
+    T& operator[](int index)
+    {
+        return m_array[index];
+    }
+};
+
+// Showing how a function for a class with a non-type parameter is defined outside of the class
+template <typename T, int size>
+T* StaticArray<T, size>::getArray()
+{
+    return m_array;
+}
+
+int main()
+{
+    // declare an integer array with room for 12 integers
+    StaticArray<int, 12> intArray;
+
+    // Fill it up in order, then print it backwards
+    for (int count { 0 }; count < 12; ++count)
+        intArray[count] = count;
+
+    for (int count { 11 }; count >= 0; --count)
+        std::cout << intArray[count] << ' ';
+    std::cout << '\n';
+
+    // declare a double buffer with room for 4 doubles
+    StaticArray<double, 4> doubleArray;
+
+    for (int count { 0 }; count < 4; ++count)
+        doubleArray[count] = 4.4 + 0.1 * count;
+
+    for (int count { 0 }; count < 4; ++count)
+        std::cout << doubleArray[count] << ' ';
+
+    return 0;
+}
+```
+
+### 指定函数模板
+
+> 对于指定的模板类型，使用另外定义的模板函数
+
+下面的例子规定了T是字符指针时的操作，因此可以打印出字符串和字符指针：
+
+额外指定析构器必须有默认的析构器！
+
+```cpp
+#include <iostream>
+#include <string>
+
+template <typename T>
+class Storage
+{
+private:
+    T m_value{};
+public:
+    Storage(T value)
+        : m_value{ value }
+    {
+    }
+    ~Storage() {}; // need an explicitly defined destructor to specialize
+
+    void print()
+    {
+        std::cout << m_value << '\n';
+    }
+};
+
+template <>
+Storage<char*>::Storage(char* const value)
+{
+    if (!value)
+        return;
+
+    // Figure out how long the string in value is
+    int length{ 0 };
+    while (value[length] != '\0')
+        ++length;
+    ++length; // +1 to account for null terminator
+
+    // Allocate memory to hold the value string
+    m_value = new char[length];
+
+    // Copy the actual value string into the m_value memory we just allocated
+    for (int count = 0; count < length; ++count)
+        m_value[count] = value[count];
+}
+
+template <>
+Storage<char*>::~Storage()
+{
+    delete[] m_value;
+}
+
+int main()
+{
+    // Dynamically allocate a temporary string
+    std::string s;
+
+    // Ask user for their name
+    std::cout << "Enter your name: ";
+    std::cin >> s;
+
+    // Store the name
+    Storage<char*> storage(s.data());
+
+    storage.print(); // Prints our name
+
+    s.clear(); // clear the std::string
+
+    storage.print(); // Prints our name
+}
+```
+
+
 
 ## 类方法定义和头文件
 
@@ -4838,6 +5853,50 @@ MyString& MyString::operator=(const MyString& source)
 }
 ```
 
+## Move Semantics
+
+> **Move semantics** means the class will transfer ownership of the object rather than making a copy.
+>
+> **Copy semantics** means have our copy constructor and assignment operator copy the pointer.
+
+###  std::move
+
+> 将参数转化为rvalue引用，从而使用move semantics
+>
+> move semantics赋予给等号左边，而右边直接变为null
+
+下面的例子将交换过程本来需要的三次复制变成了三次移动过程，从而减少overhead：
+
+```cpp
+#include <iostream>
+#include <string>
+#include <utility> // for std::move
+
+template<class T>
+void myswapMove(T& a, T& b)
+{
+	T tmp { std::move(a) }; // invokes move constructor
+	a = std::move(b); // invokes move assignment
+	b = std::move(tmp); // invokes move assignment
+}
+
+int main()
+{
+	std::string x{ "abc" };
+	std::string y{ "de" };
+
+	std::cout << "x: " << x << '\n';
+	std::cout << "y: " << y << '\n';
+
+	myswapMove(x, y);
+
+	std::cout << "x: " << x << '\n';
+	std::cout << "y: " << y << '\n';
+
+	return 0;
+}
+```
+
 
 
 # 代码组织
@@ -5053,25 +6112,426 @@ static int foo() {};     // defines internal function
 
 # 异常
 
++ 不使用变量可以不定义变量名：`catch (double)`
+
++ catch的参数：基本类型以值传递，非基本类型需要以常量引用传递
+
++ catch的参数没有类型转换
+
++ 异常被catch之后继续执行catch块下面的内容而不是紧接着抛出异常的地方
+
+  > 一个函数中若抛出异常且没有catch这个异常，则会**unwind调用栈**到上一个函数查找能handle的catch语句
+
 ```c++
 #include <iostream>
+#include <string>
+
 int main()
 {
     try
     {
-        std::cout << "Let's assume some error occurred in our program." << '\n';
-        std::cout << "We throw an exception of type int, for example." << '\n';
-        std::cout << "This signals that something went wrong." << '\n';
-        throw 123; // throw an exception if there is an error
+        // Statements that may throw exceptions you want to handle go here
+        throw -1; // here's a trivial example
+        throw 0.2;
     }
-    catch (int e)
+    catch (int x)
     {
-        // catch and handle the exception
-        std::cout << "Exception raised!." << '\n';
-        std::cout << "The exception has a value of " << e << '\n';
+        // Any exceptions of type int thrown within the above try block get sent here
+        std::cerr << "We caught an int exception with value: " << x << '\n';
+    }
+    catch (double) // no variable name since we don't use the exception itself in the catch block below
+    {
+        // Any exceptions of type double thrown within the above try block get sent here
+        std::cerr << "We caught an exception of type double" << '\n';
+    }
+    catch (const std::string&) // catch classes by const reference
+    {
+        // Any exceptions of type std::string thrown within the above try block get sent here
+        std::cerr << "We caught an exception of type std::string" << '\n';
+    }
+
+    std::cout << "Continuing on our merry way\n";
+
+    return 0;
+}
+```
+
+## catch_all
+
++ 用于捕获任何异常
++ 常用来包裹main函数来捕获uncaught errors
+
+```cpp
+#include <iostream>
+
+int main()
+{
+
+    try
+    {
+        runGame();
+    }
+    catch(...)
+    {
+        std::cerr << "Abnormal termination\n";
+    }
+
+    saveState(); // Save user's game
+    return 1;
+}
+```
+
+## 类的异常
+
++ 对于成员函数不能返回错误码，可以直接用`throw`抛出异常
+
++ 当**constructors fail**时，不会调用析构器，因此需要保证成员服从RAII（有对应的初始化和析构）
+
++ 区分基类和派生类的错误需要将派生类catch放在基类catch之前，因为基类catch也能获取到派生类：
+
+```cpp
+#include <iostream>
+
+class Base
+{
+public:
+    Base() {}
+};
+
+class Derived: public Base
+{
+public:
+    Derived() {}
+};
+
+int main()
+{
+    try
+    {
+        throw Derived();
+    }
+    catch (const Derived& derived)
+    {
+        std::cerr << "caught Derived";
+    }
+    catch (const Base& base)
+    {
+        std::cerr << "caught Base";
+    }
+
+    return 0;
+}
+```
+
+## **exception class**
+
++ 错误类用来被抛出和储存错误信息
++ catch错误类需要用**常量引用**来避免额外复制
+
+```cpp
+#include <iostream>
+#include <string>
+#include <string_view>
+
+class ArrayException
+{
+private:
+	std::string m_error;
+
+public:
+	ArrayException(std::string_view error)
+		: m_error{ error }
+	{
+	}
+
+	const std::string& getError() const { return m_error; }
+};
+
+class IntArray
+{
+private:
+	int m_data[3]{}; // assume array is length 3 for simplicity
+
+public:
+	IntArray() {}
+
+	int getLength() const { return 3; }
+
+	int& operator[](const int index)
+	{
+		if (index < 0 || index >= getLength())
+			throw ArrayException{ "Invalid index" };
+
+		return m_data[index];
+	}
+
+};
+
+int main()
+{
+	IntArray array;
+
+	try
+	{
+		int value{ array[5] }; // out of range subscript
+	}
+	catch (const ArrayException& exception)
+	{
+		std::cerr << "An array exception occurred (" << exception.getError() << ")\n";
+	}
+}
+```
+
+## **std::exception**
+
+> C++的标准错误基类，定义在`<exception>`
+>
+> .what() 描述了具体错误
+
+```cpp
+#include <cstddef> // for std::size_t
+#include <exception> // for std::exception
+#include <iostream>
+#include <limits>
+#include <string> // for this example
+
+int main()
+{
+    try
+    {
+        // Your code using standard library goes here
+        // We'll trigger one of these exceptions intentionally for the sake of the example
+        std::string s;
+        s.resize(std::numeric_limits<std::size_t>::max()); // will trigger a std::length_error or allocation exception
+    }
+    // This handler will catch std::exception and all the derived exceptions too
+    catch (const std::exception& exception)
+    {
+        std::cerr << "Standard exception: " << exception.what() << '\n';
+    }
+
+    return 0;
+}
+```
+
+### 直接抛出标准异常
+
+```cpp
+#include <exception> // for std::exception
+#include <iostream>
+#include <stdexcept> // for std::runtime_error
+
+int main()
+{
+	try
+	{
+		throw std::runtime_error("Bad things happened");
+	}
+	// This handler will catch std::exception and all the derived exceptions too
+	catch (const std::exception& exception)
+	{
+		std::cerr << "Standard exception: " << exception.what() << '\n';
+	}
+
+	return 0;
+}
+```
+
+### 继承
+
++ `noexcept`标志函数自己不会抛出异常
+
+```cpp
+#include <exception> // for std::exception
+#include <iostream>
+#include <string>
+#include <string_view>
+
+class ArrayException : public std::exception
+{
+private:
+	std::string m_error{}; // handle our own string
+
+public:
+	ArrayException(std::string_view error)
+		: m_error{error}
+	{
+	}
+
+	// std::exception::what() returns a const char*, so we must as well
+	const char* what() const noexcept override { return m_error.c_str(); }
+};
+
+class IntArray
+{
+private:
+	int m_data[3] {}; // assume array is length 3 for simplicity
+
+public:
+	IntArray() {}
+
+	int getLength() const { return 3; }
+
+	int& operator[](const int index)
+	{
+		if (index < 0 || index >= getLength())
+			throw ArrayException("Invalid index");
+
+		return m_data[index];
+	}
+
+};
+
+int main()
+{
+	IntArray array;
+
+	try
+	{
+		int value{ array[5] };
+	}
+	catch (const ArrayException& exception) // derived catch blocks go first
+	{
+		std::cerr << "An array exception occurred (" << exception.what() << ")\n";
+	}
+	catch (const std::exception& exception)
+	{
+		std::cerr << "Some other std::exception occurred (" << exception.what() << ")\n";
+	}
+}
+```
+
+## 再次抛出
+
++ 适用于需要获取到错误信息但不想立即处理的情况
++ 方法1：抛出一个新的异常
+
+```cpp
+int getIntValueFromDatabase(Database* d, std::string table, std::string key)
+{
+    assert(d);
+
+    try
+    {
+        return d->getIntValue(table, key); // throws int exception on failure
+    }
+    catch (int exception)
+    {
+        // Write an error to some global logfile
+        g_log.logError("getIntValueFromDatabase failed");
+
+        throw 'q'; // throw char exception 'q' up the stack to be handled by caller of getIntValueFromDatabase()
+        // 不能直接抛出。因为这样会复制一份，且copy初始化有可能导致派生错误类被切片为基类：Base &exception
+        throw exception; 
     }
 }
 ```
+
++ 方法2：再次抛出同样的错误
+
+**只需要使用throw即可**
+
+```cpp
+#include <iostream>
+class Base
+{
+public:
+    Base() {}
+    virtual void print() { std::cout << "Base"; }
+};
+
+class Derived: public Base
+{
+public:
+    Derived() {}
+    void print() override { std::cout << "Derived"; }
+};
+
+int main()
+{
+    try
+    {
+        try
+        {
+            throw Derived{};
+        }
+        catch (Base& b)
+        {
+            std::cout << "Caught Base b, which is actually a ";
+            b.print();
+            std::cout << '\n';
+            throw; // note: We're now rethrowing the object here
+        }
+    }
+    catch (Base& b)
+    {
+        std::cout << "Caught Base b, which is actually a ";
+        b.print();
+        std::cout << '\n';
+    }
+
+    return 0;
+}
+```
+
+##  **function catch blocks**
+
++ 加上try到函数之前，函数中的异常都能被捕获
++ 函数类型和catch的行为
+
+![image-20221109194325360](CPP笔记.assets/image-20221109194325360.png)
+
+```cpp
+#include <iostream>
+
+class A
+{
+private:
+	int m_x;
+public:
+	A(int x) : m_x{x}
+	{
+		if (x <= 0)
+			throw 1; // Exception thrown here
+	}
+};
+
+class B : public A
+{
+public:
+	B(int x) try : A{x} // note addition of try keyword here
+	{
+	}
+	catch (...) // note this is at same level of indentation as the function itself
+	{
+                // Exceptions from member initializer list or constructor body are caught here
+
+                std::cerr << "Exception caught\n";
+
+                throw; // rethrow the existing exception
+	}
+};
+
+int main()
+{
+	try
+	{
+		B b{0};
+	}
+	catch (int)
+	{
+		std::cout << "Oops\n";
+	}
+}
+```
+
+
+
+
+
+
+
+
 
 
 
