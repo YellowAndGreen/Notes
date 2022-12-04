@@ -6,6 +6,20 @@
 
 ## 安装Trick
 
+鱼香ROS一键安装
+
+```
+wget [http://fishros.com/install](https://gitee.com/link?target=http%3A%2F%2Ffishros.com%2Finstall) -O fishros && . fishros
+```
+
+查看历史版本
+
+```
+sudo apt-cache policy init-system-helpers
+```
+
+
+
 1. 手册中的链接直接复制会少一个-，导致网址错误
 2. 依赖冲突使用aptitude解决
 3. 安装后需要配置ros的环境变量
@@ -1546,9 +1560,20 @@ add_executable(basic_shapes src/basic_shapes.cpp)
 target_link_libraries(basic_shapes ${catkin_LIBRARIES})
 ```
 
+# 问题
 
+## rosrun段错误
 
+```
+rosrun rqt_robot_steering rqt_robot_steering
+```
 
+> conda环境和python环境冲突导致
 
+默认禁用即可：
 
+```
+# 默认关闭conda环境，若需打开使用conda activate base
+conda deactivate
+```
 
