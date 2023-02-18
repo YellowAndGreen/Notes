@@ -47,4 +47,34 @@
 
 8. To beguile the time,
    Look like the time; 
+   
+9. **BANQUO**
+
+   > Hold, take my sword. There's husbandry in heaven;
+   > Their candles are all out. Take thee that too.
+   > A heavy summons lies like lead upon me,
+   > And yet I would not sleep: merciful powers,
+   > Restrain in me the cursed thoughts that nature
+   > Gives way to in repose!
+
+10. **MACBETH**
+
+    > Methought I heard a voice cry 'Sleep no more!
+    > Macbeth does murder sleep', the innocent sleep,
+    > Sleep that knits up the ravell'd sleeve of care,
+    > The death of each day's life, sore labour's bath,
+    > Balm of hurt minds, great nature's second course,
+    > Chief nourisher in life's feast,--
+
+11. **MACBETH**
+
+    > Whence is that knocking?
+    > How is't with me, when every noise appals me?
+    > What hands are here? ha! they pluck out mine eyes.
+    > Will all great Neptune's ocean wash this blood
+    > Clean from my hand? No, this my hand will rather
+    > The multitudinous seas in incarnadine,
+    > Making the green one red.
+
+12. 
 
