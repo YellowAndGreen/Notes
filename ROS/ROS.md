@@ -1577,3 +1577,17 @@ rosrun rqt_robot_steering rqt_robot_steering
 conda deactivate
 ```
 
+## 无法rosbag play
+No handlers could be found for logger “rosout”， /opt/ros/melodic/lib/rosbag/play: error while loading shared libraries: librosbag.so: cannot open shared object file: No such file or directory
+
+原因：
+原因是环境变量 ~/.bashrc 中没有添加相关库的路径 或者 可能在环境变量~/.bashrc文件中在用LD_LIBRARY_PATH添加相关变量路径的时候直接使用覆盖添加了LD_LIBRARY_PATH，而不是从属添加进去，导致LD_LIBRARY_PATH中的其他变量路径都找不到了，比如把ROS的路径也覆盖了，导致无法找到ros相关的动态库。一般出现该问题是后者原因大一些，如果是前者环境变量中没有添加相关库的路径的话，直接进行从属添加进去即可，两者都可参考下面的解决方法进行从属添加。
+
+解决方法：
+网上很多方法是使用手动指定或者在环境变量中用ROS的再次覆盖，比如下面方法1和方法2，这不能从根本上解决问题。正确的方法是在环境变量中添加变量路径的时候要使用从属添加方式，如方法3中所示。
+在当前行输入命令如下命令，然后再执行播放bag包命令：
+方法1：命令行直接输入：LD_LIBRARY_PATH=/opt/ros/melodic/lib
+方法2：在环境变量中加入：
+
+sudo gedit ~/.bashrc
+export LD_LIBRARY_PATH=/opt/ros/melodic/lib

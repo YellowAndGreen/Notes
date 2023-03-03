@@ -71,12 +71,15 @@ rosbag play ./bag/20220815test3.bag /rslidar_points:=/points_raw
 
 ```
 rosbag record -O map.bag /ndt_map
+rosbag record -O map.bag /lvi_sam/lidar/mapping/map_global
 ```
 
 将bag包转换为pcd文件：
 
 ```
 rosrun pcl_ros bag_to_pcd map.bag /bdt_map xxx.pcd
+
+rosrun pcl_ros bag_to_pcd map.bag /lvi_sam/lidar/mapping/map_global lvi_demo.pcd
 ```
 
 
