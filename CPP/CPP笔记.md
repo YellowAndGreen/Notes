@@ -2112,6 +2112,7 @@ The stack has advantages and disadvantages:
 
 + 若省略返回类型，则默认为auto，但函数返回类型在第一次推导后就不变且不再推导了，因此需要保证前后返回类型一致
 + 使用函数指针，`auto`和`std::function`初始化匿名函数变量。优先使用auto，auto有时会因为不能在编译时弄清类型而出错，使用`std::function`即可。
++ 传入参数使用&引用可减少时间
 
 ```cpp
 #include <functional>
@@ -7504,7 +7505,7 @@ int main()
 ### 求和std::accumulate
 
 ```c++
-accumulate(num.begin(), num.end(), 0)
+accumulate(num.begin(), num.end(), 0) // 0s
 ```
 
 

@@ -76,5 +76,14 @@
     > The multitudinous seas in incarnadine,
     > Making the green one red.
 
-12. 
+12. **MACBETH**
+
+    > Had I but died an hour before this chance,
+    > I had lived a blessed time; for, from this instant,
+    > There 's nothing serious in mortality:
+    > All is but toys: renown and grace is dead;
+    > The wine of life is drawn, and the mere lees
+    > Is left this vault to brag of.
+
+13. 
 

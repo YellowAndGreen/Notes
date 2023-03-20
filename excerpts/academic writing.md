@@ -1,6 +1,9 @@
 ## Excerpt
 
 + our panoptic driving perception singleshot network, **termed** as YOLOP, contains
++ To address the **aforementioned** problems in previous approaches, we propose a new system for real-time automated driving based on developments described in [30].
++ Achieving 3D reconstructions in real-time from images alone is **a key**
+  **enabler for** applications in robotics, surveying, and gaming.
 
 ### adj
 
