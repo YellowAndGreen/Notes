@@ -220,6 +220,7 @@ using namespace Eigen;
 
 int main(int argc, char** argv) {
   Quaterniond q1(0.35, 0.2, 0.3, 0.1), q2(-0.5, 0.4, -0.1, 0.2);
+  // 使用四元数Quaterniond之前需要归一化！
   q1.normalize();
   q2.normalize();
   Vector3d t1(0.3, 0.1, 0.1), t2(-0.1, 0.5, 0.3);
