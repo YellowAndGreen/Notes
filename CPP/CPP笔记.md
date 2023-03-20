@@ -1042,8 +1042,7 @@ explicit Person(std::string name):name{std::move(name)}{}
 
 void myfunction()
 {
-    static int x = 0; // defined only the first time, skipped every other
-// time
+    static int x = 0; // defined only the first time, skipped every other time
     x++;
     std::cout << x << '\n';
 }
@@ -6943,6 +6942,69 @@ int main()
 }
 ```
 
+## Mutex锁
+
+Mutex 系列类(四种)
+
+- std::mutex，最基本的 Mutex 类。
+- std::recursive_mutex，递归 Mutex 类。
+- std::time_mutex，定时 Mutex 类。
+- std::recursive_timed_mutex，定时递归 Mutex 类。
+
+函数
+
+- std::try_lock，尝试同时对多个互斥量上锁。
+- std::lock，可以同时对多个互斥量上锁。
+- std::call_once，如果多个线程需要同时调用某个函数，call_once 可以保证多个线程对该函数只调用一次。
+
+#### std::mutex 
+
+- 构造函数，std::mutex不允许拷贝构造，也不允许 move 拷贝，最初产生的 mutex 对象是处于 unlocked 状态的。
+- lock()，调用线程将锁住该互斥量。线程调用该函数会发生下面 3 种情况：(1). 如果该互斥量当前没有被锁住，则调用线程将该互斥量锁住，直到调用 unlock之前，该线程一直拥有该锁。(2). 如果当前互斥量被其他线程锁住，则当前的调用线程被阻塞住。(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+- unlock()， 解锁，释放对互斥量的所有权。
+- try_lock()，尝试锁住互斥量，如果互斥量被其他线程占有，则当前线程也不会被阻塞。线程调用该函数也会出现下面 3 种情况，(1). 如果当前互斥量没有被其他线程占有，则该线程锁住互斥量，直到该线程调用 unlock 释放互斥量。(2). 如果当前互斥量被其他线程锁住，则当前调用线程返回 false，而并不会被阻塞掉。(3). 如果当前互斥量被当前调用线程锁住，则会产生死锁(deadlock)。
+
+```CPP
+#include <iostream>       // std::cout
+#include <thread>         // std::thread
+#include <mutex>          // std::mutex
+
+volatile int counter(0); // non-atomic counter
+std::mutex mtx;           // locks access to counter
+
+void attempt_10k_increases() {
+    for (int i=0; i<10000; ++i) {
+        if (mtx.try_lock()) {   // only increase if currently not locked:
+            ++counter;
+            mtx.unlock();
+        }
+    }
+}
+
+int main (int argc, const char* argv[]) {
+    std::thread threads[10];
+    for (int i=0; i<10; ++i)
+        threads[i] = std::thread(attempt_10k_increases);
+
+    for (auto& th : threads) th.join();
+    std::cout << counter << " successful increases of the counter.\n";
+
+    return 0;
+}
+```
+
+#### std::unique_lock 
++ unique_lock 对象以独占所有权的方式（ unique owership）管理 mutex 对象的上锁和解锁操作，所谓独占所有权，就是没有其他的 unique_lock 对象同时拥有某个 mutex 对象的所有权。
++ 在构造(或移动(move)赋值)时，unique_lock 对象需要传递一个 Mutex 对象作为它的参数，新创建的 unique_lock 对象负责传入的 Mutex 对象的上锁和解锁操作。
++ unique_lock 对象同样也不负责管理 Mutex 对象的生命周期，unique_lock 对象只是简化了 Mutex 对象的上锁和解锁操作，方便线程对互斥量上锁，即在某个 unique_lock 对象的声明周期内，它所管理的锁对象会一直保持上锁状态；而 unique_lock 的生命周期结束之后，它所管理的锁对象会被解锁，这一点和 lock_guard 类似
+
+```cpp
+KeyframesType GetAllKeyFrames() {
+    std::unique_lock<std::mutex> lck(data_mutex_);
+    return keyframes_;
+}
+```
+
 
 
 ## 容器
@@ -7180,7 +7242,26 @@ int main() {
 }
 ```
 
+### std::list
 
+头文件:
+
+```
+#include <list>
+```
+
+
+模板类list是一个容器，list是由双向链表来实现的，每个节点存储1个元素。list支持前后两种移动方向。
+
+优势： 任何位置执行插入和删除动作都非常快
+
+list与vector的区别：
+
+1. list不支持随机存取;
+2. 在list的任何位置执行插入和移除都非常快.插入和删除动作不影响指向其它元素的指针,引用,迭代器,不会造成失效;
+3. list不支持随机存取,不提供下标操作符和at()函数;
+4. list没有提供容量,空间重新分配等操作函数,每个元素都有自己的内存;
+5. list也提供了特殊成员函数,专门用于移动元素.
 
 ### std::map
 
