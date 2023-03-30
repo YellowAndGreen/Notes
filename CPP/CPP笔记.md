@@ -32,6 +32,8 @@ a++ 和++a 都是将a 加1，但是a++ 返回值为a，而++a 返回值为a+1。
 
 **省去了对a复制一个新的copy，以及之后删除这个临时copy的时间和空间**
 
+> C++ Primer Plus：对于内置类型没有区别，但对用户定义的类型`++j`更有效率
+
 ![image-20220923220015172](CPP笔记.assets/image-20220923220015172.png)
 
 ## main参数
@@ -87,7 +89,10 @@ int main()
 int x = 123;   // Copy initialization
 int y{ 123 };  // Brace initialization
 int z = { };   // 初始化为0
-
+int a{INT_MAX}; // 初始化为最大值，还有INT_MIN
+// 不能用vector.size来列表初始化，列表初始化不接受类型narrow
+int x{vector.size()};
+    
 // 初始化多个变量
 int a, b = 5; // wrong (a is not initialized!)
 int a = 5, b = 5; // correct
@@ -442,7 +447,7 @@ int array[3][5]
 };
 ```
 
-4. 动态分配数组的大小，删除数组时需要用`delete[]`
+4. 使用`new`动态分配数组的大小，删除数组时需要用`delete[]`
 
 ```cpp
 #include <iostream>
@@ -469,7 +474,12 @@ int main()
 
 ## 字符串
 
+> C++中有两种字符串：C-style string和string库字符串
+>
+> C-style string以空字符`\0`结尾
+
 + `std::string`的变量赋值会产生一个新的copy，开销很大，更倾向于使用`std::string_view`
++ 字符用单引号，字符串用双引号
 
 ```c++
 std::string s= "asddasdad";
@@ -1466,8 +1476,6 @@ std::cout << (x > y) ? x : y << '\n';  // 可能出错
 std::cout << ((x > y) ? x : y) << '\n';  //应该始终用括号包括条件操作符
 ```
 
-
-
 ## if
 
 > 逻辑运算符：&&，||，!，^(异或操作)
@@ -1581,13 +1589,7 @@ switch (1)
 
 ## for
 
-```c++
-    for (int i=0;i<10;i++) {
-        std::cout << i<<"\n";
-    }
-```
-
-在循环中使用多个计数变量
+在循环中使用**逗号运算符**实现多个计数变量：
 
 ```cpp
 #include <iostream>
@@ -6085,7 +6087,7 @@ int main()
 }
 ```
 
-3. 若在块里使用，则只在块里有效。若在全局使用，则全局有效。
+3. ==若在块里使用，则只在块里有效。若在全局使用，则全局有效==。
 4. ==一旦using被声明，没有办法取消或者替换！！！==
 
 
@@ -6541,6 +6543,21 @@ int main()
 
 # I/O流
 
+总结
+
+```CPP
+// cin在遇到空格时会结束输入
+cin>>s;
+//一次读取一行到s中
+getline(cin,s)
+// cin.get()j
+char ch; 
+ch=cin.get();               //或者cin.get(ch); 
+cout<<ch<<endl; 
+```
+
+
+
 ## 命令行输入和输出
 
 > 调试异常时最好使用std::cerr来立即获得输出
@@ -6692,12 +6709,12 @@ int main()
 
 ## 字符串流
 
+### std::stringstream
+
 1. std::stringstream - the stream to read from a string
 2. std::otringstream - the stream to write to a string
 3. std::stringstream - the stream to both read from and write to a
    string
-
-
 
 ```c++
 #include <iostream>
@@ -6708,6 +6725,27 @@ int main()
     std::stringstream ss;
     ss << "Hello World.";
     std::cout << ss.str(); << "xu"
+}
+```
+
+### cin
+
+1. `cin`忽略换行和空格，`cin.get(ch)`读取单个字符，包括空格和换行
+2. `cin`检测到EOF(end of file)时，会设置`cin`对象中的EOF条件标记，设置标记后`cin`将不再读取输入，调用`cin.clear`后可以清除EOF条件标记
+3. 输入错误和EOF都将导致`cin`返回`false`
+
+```CPP
+#include<vector>
+#include<iostream>
+
+using namespace std;
+
+int main() {
+    int ch{0};
+    while (cin>>ch) {
+        cout<<"成功";
+    }
+    return 0;
 }
 ```
 
@@ -7026,6 +7064,8 @@ KeyframesType GetAllKeyFrames() {
 + 使用`length`或者`size`来获取数组的长度
 + 使用`capacity()`来获取数组的容量（个数上限，一定比`size`大）
 + `reserve`()来预分配一定的`capacity`，因为数组resize很贵
++ 使用`vec.insert(vec.begin()+i, el)`来插入元素到指定位置
++ `emplace`也可以插入元素，但参数值是作为构造函数的值来插入的，如：`vector<vector<int>>  q;  q.emplace(i, j);`中就地创建了一个vector，参数为i和j
 
 ```c++
 #include <vector>
@@ -7040,6 +7080,8 @@ int main()
     std::vector<int> color2(4);
     // 二维数组初始化
     std::vector<std::vector<int>> graph(10,std::vector<int>());
+    // 不能用vector.size来列表初始化，列表初始化不接受类型narrow
+    int x{vector.size()};
     // 入栈操作
     v.push_back(10);
     // 两种获取元素的方法
@@ -7082,6 +7124,8 @@ int main()
 3. 使用`array.size()`获取数组大小
 
 4. 手动使用index遍历数组需要使用`size_t`，因为array.size()返回的时`unsignal`整型
+
+5. array长度不能是变量
 
    **std::array::size_type is just an alias for std::size_t**
 
@@ -7147,6 +7191,10 @@ int main() {
     // 插入数据
     q.push(1);
     q.push(2);
+    // 使用emplace插入数据
+    q.emplace(1,2);
+    std::queue<pair<int,int>> q1;
+    q.emplace(1,2);
     // 访问第一个元素
     std::cout <<q.front();
     // 访问最后一个元素
@@ -7163,7 +7211,7 @@ int main() {
 
 empty() 堆栈为空则返回真
 
-pop() 移除栈顶元素
+pop() 移除栈顶元素，不会返回元素
 
 push() 在栈顶增加元素
 
@@ -7311,7 +7359,7 @@ int main()
 int main()
 {
 std::pair<int, double> mypair = { 123, 3.14 };
-auto [r, c] = mypair
+auto [r, c] = mypair; // 使用decomposition declaration分别获取两个值
 std::cout << "The first element is: " << mypair.first << '\n';
 std::cout << "The second element is: " << mypair.second << '\n';
 }
@@ -7441,6 +7489,16 @@ int main()
     }
 }
 ```
+
+### std::is_sorted
+
+判断是否已经排序好
+
+```
+is_sorted(nums.begin(), nums.end())
+```
+
+
 
 ### std::find  std::find_if
 
@@ -7610,7 +7668,7 @@ int main()
 ### 求和std::accumulate
 
 ```c++
-accumulate(num.begin(), num.end(), 0) // 0s
+accumulate(num.begin(), num.end(), 0) // 0+求和值
 ```
 
 
