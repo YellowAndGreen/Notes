@@ -1,7 +1,3 @@
-```
-
-```
-
 # 基本
 
 ## 注释
@@ -1662,6 +1658,8 @@ int main()
 
 # 函数
 
++ 实参(argument)表示用于接收传递值的变量，形参(parameter)表示传递给函数的值
+
 1. 最好先声明，再定义后再使用
 
 ```c++
@@ -1808,8 +1806,31 @@ int main()
 + Some types of functions are implicitly treated as inline functions. These include:
 
   - Functions defined inside a class, struct, or union type definition.
+- Constexpr / consteval functions ([6.14 -- Constexpr and consteval functions](https://www.learncpp.com/cpp-tutorial/constexpr-and-consteval-functions/))
+- 使用inline将函数转为内联函数，inline只能写在函数定义前，由于内联函数一般短小，因此直接在声明位置处定义（而不是下面）
 
-  - Constexpr / consteval functions ([6.14 -- Constexpr and consteval functions](https://www.learncpp.com/cpp-tutorial/constexpr-and-consteval-functions/))
+```CPP
+#include <iostream>
+using namespace std;
+
+//内联函数，交换两个数的值
+inline void swap(int *a, int *b){
+    int temp;
+    temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+int main(){
+    int m, n;
+    cin>>m>>n;
+    cout<<m<<", "<<n<<endl;
+    swap(&m, &n);
+    cout<<m<<", "<<n<<endl;
+
+    return 0;
+}
+```
 
 ## 常量函数
 
@@ -6629,6 +6650,7 @@ int main()
 {
     std::fstream fs{ "myfile.txt" };
     std::string s;
+    // 读取到末尾会有自动eof标记，从而结束循环
     while (fs)
     {
         std::getline(fs, s); // read each line into a string
@@ -6647,6 +6669,7 @@ int main()
     std::fstream fs{ "myfile.txt" };
     char c;
     // 默认不会读取空格，使用std::noskipws读取
+    // >>返回fs自身，用作布尔判断时会返回自身状态
     while (fs >> std::noskipws >> c)
     {
         std::cout << c;
@@ -7066,6 +7089,7 @@ KeyframesType GetAllKeyFrames() {
 + `reserve`()来预分配一定的`capacity`，因为数组resize很贵
 + 使用`vec.insert(vec.begin()+i, el)`来插入元素到指定位置
 + `emplace`也可以插入元素，但参数值是作为构造函数的值来插入的，如：`vector<vector<int>>  q;  q.emplace(i, j);`中就地创建了一个vector，参数为i和j
++ 使用`swap(a[++i], a[j]);`来交换两个元素
 
 ```c++
 #include <vector>
@@ -7206,6 +7230,29 @@ int main() {
     std::cout<<q.front();
 }
 ```
+
+### std::deque
+
+两端插入操作：
+
+```CPP
+push_back(elem); //在容器尾部添加一个数据
+push_front(elem); //在容器头部插入一个数据
+pop_back(); //删除容器最后一个数据
+pop_front(); //删除容器第一个数据
+```
+
+指定位置操作：
+
+```CPP
+insert(pos,elem); //在pos位置插入一个elem元素的拷贝，返回新数据的位置。
+insert(pos,n,elem); //在pos位置插入n个elem数据，无返回值。
+insert(pos,beg,end); //在pos位置插入[beg,end)区间的数据，无返回值。
+clear(); //清空容器的所有数据
+erase(beg,end); //删除[beg,end)区间的数据，返回下一个数据的位置。
+```
+
+
 
 ### std::stack
 
