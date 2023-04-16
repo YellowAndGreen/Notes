@@ -7090,6 +7090,8 @@ KeyframesType GetAllKeyFrames() {
 + 使用`vec.insert(vec.begin()+i, el)`来插入元素到指定位置
 + `emplace`也可以插入元素，但参数值是作为构造函数的值来插入的，如：`vector<vector<int>>  q;  q.emplace(i, j);`中就地创建了一个vector，参数为i和j
 + 使用`swap(a[++i], a[j]);`来交换两个元素
++ 用`v.clear()`来清空数组的所有元素
++ 用`reverse(v.begin(),v.end())`来反转数组，若用下标来控制反转范围则结束index需要加一`reverse(v.begin()+start,v.begin()+end+1`
 
 ```c++
 #include <vector>
