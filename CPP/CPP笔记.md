@@ -7274,6 +7274,8 @@ top() 返回栈顶元素，不会删除栈顶元素
 
 与其类似还有unordered_set
 
++ 使用`set<int>::iterator iter`初始化其迭代器，使用星号获取值`*iter`
+
 > Set is a container that holds unique, sorted objects. It is a binary tree of sorted objects.
 
 ```c++
@@ -7292,6 +7294,12 @@ int main() {
     
     // 通过迭代器初始化一个容器
     std::set<int> dict(to_delete.begin(),to_delete.end());
+    // 遍历Set
+    set<int> s = demo;
+    set<int>::iterator iter;
+    for (iter = s.begin(); iter != s.end(); ++iter) {
+        cout << *iter << " ";
+    }
 }
 ```
 
