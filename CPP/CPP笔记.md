@@ -476,6 +476,7 @@ int main()
 
 + `std::string`的变量赋值会产生一个新的copy，开销很大，更倾向于使用`std::string_view`
 + 字符用单引号，字符串用双引号
++ 字符串也能使用`vector`的`push_back`和`pop_back`
 
 ```c++
 std::string s= "asddasdad";
@@ -7344,6 +7345,16 @@ int main() {
     std::unordered_map<int,int> myset;
     myset.insert({1, 1});
     std::cout << myset[1];
+    // 遍历时使用迭代器指针需要用箭头来获取成员
+    // set由于只有一个数，因此使用*来析构
+    for(auto i=m.begin();i!=m.end();++i){
+        cout<<i->first<<' '<<i->second<<endl;
+    }
+    // ！！！注意：当map中已有值时，用emplace加入不会改变已有值
+    std::unordered_map<int,bool> m;
+    m.emplace(1,true);
+    m.emplace(2,false);
+    m.emplace(1,false);
 }
 ```
 
@@ -7420,6 +7431,33 @@ auto [r, c] = mypair; // 使用decomposition declaration分别获取两个值
 std::cout << "The first element is: " << mypair.first << '\n';
 std::cout << "The second element is: " << mypair.second << '\n';
 }
+```
+
+### priority_queue
+
+优先级队列，以堆实现，可以用作大根堆和小根堆，其中的第一个元素是最大值或最小值
+
+第一个参数是存储类型，第二个是底层容器，第三个是判断函数
+
+```CPP
+class Solution {
+public:
+    int findKthLargest(vector<int>& nums, int k) {
+        // 小顶堆，堆顶是最小元素
+        priority_queue<int, vector<int>, greater<int>> pq;
+        for (int e : nums) {
+            // 每个元素都要过一遍二叉堆
+            pq.push(e);
+            // 堆中元素多于 k 个时，删除堆顶元素
+            if (pq.size() > k) {
+                pq.pop();
+            }
+        }
+        // pq 中剩下的是 nums 中 k 个最大元素，
+        // 堆顶是最小的那个，即第 k 个最大元素
+        return pq.top();
+    }
+};
 ```
 
 
@@ -7726,6 +7764,28 @@ int main()
 
 ```c++
 accumulate(num.begin(), num.end(), 0) // 0+求和值
+```
+
+### 生成随机数
+
+```CPP
+
+
+{//产生 [0,b) 范围内到随机数  
+  int randoxNumber = rand() % b ;
+}
+{//产生 [a,b) 范围内到随机数 
+    int randoxNumber = a + rand() % ( b -a ) ;
+}
+{//产生 [a,b] 范围内到随机数 
+    int randoxNumber = a + rand() % ( b -a +1 ) ;
+}
+{//产生 [0,1] 范围内到随机小数 
+    double randoxNumber =rand() / RAND_MAX
+}
+{//产生 [0,1) 范围内到随机小数 
+    double randoxNumber =rand() / ( RAND_MAX +1 )
+}
 ```
 
 
