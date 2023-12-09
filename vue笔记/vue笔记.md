@@ -494,6 +494,468 @@ watchEffect(async () => {
 
 
 
+### 响应式基础
+
+#### `ref()`
+
+在组合式 API 中，推荐使用 [`ref()`](https://cn.vuejs.org/api/reactivity-core.html#ref) 函数来声明响应式状态：
+
+```vue
+import { ref } from 'vue'
+
+const count = ref(0)
+```
+
+`ref()` 接收参数，并将其包裹在一个带有 `.value` 属性的 ref 对象中返回：
+
+```vue
+const count = ref(0)
+
+console.log(count) // { value: 0 }
+console.log(count.value) // 0
+
+count.value++
+console.log(count.value) // 1
+```
+
+要在组件模板中访问 ref，请从组件的 `setup()` 函数中声明并返回它们：
+
+```vue
+import { ref } from 'vue'
+
+export default {
+  // `setup` 是一个特殊的钩子，专门用于组合式 API。
+  setup() {
+    const count = ref(0)
+
+    // 将 ref 暴露给模板
+    return {
+      count
+    }
+  }
+}
+```
+
+template:
+
+```
+<div>{{ count }}</div>
+```
+
+注意，在模板中使用 ref 时，我们**不**需要附加 `.value`。为了方便起见，当在模板中使用时，ref 会自动解包 (有一些[注意事项](https://cn.vuejs.org/guide/essentials/reactivity-fundamentals.html#caveat-when-unwrapping-in-templates))。
+
+***深层响应性***
+
+Ref 可以持有任何类型的值，包括深层嵌套的对象、数组或者 JavaScript 内置的数据结构，比如 `Map`。
+
+Ref 会使它的值具有深层响应性。这意味着即使改变嵌套对象或数组时，变化也会被检测到
+
+#### `<script setup>`
+
+在 `setup()` 函数中手动暴露大量的状态和方法非常繁琐。幸运的是，我们可以通过使用[单文件组件 (SFC)](https://cn.vuejs.org/guide/scaling-up/sfc.html) 来避免这种情况。我们可以使用 `<script setup>` 来大幅度地简化代码：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const count = ref(0)
+
+function increment() {
+  count.value++
+}
+</script>
+
+<template>
+  <button @click="increment">
+    {{ count }}
+  </button>
+</template>
+```
+
+
+
+<script setup> 中的顶层的导入、声明的变量和函数可在同一组件的模板中直接使用。你可以理解为模板是在同一作用域内声明的一个 JavaScript 函数——它自然可以访问与它一起声明的所有内容。
+
+#### `reactive()`
+
+还有另一种声明响应式状态的方式，即使用 `reactive()` API。与将内部值包装在特殊对象中的 ref 不同，`reactive()` 将使对象本身具有响应性：
+
+```js
+import { reactive } from 'vue'
+
+const state = reactive({ count: 0 })
+```
+
+在模板中使用：
+
+```js
+<button @click="state.count++">
+  {{ state.count }}
+</button>
+```
+
+响应式对象是 [JavaScript 代理](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)，其行为就和普通对象一样。不同的是，Vue 能够拦截对响应式对象所有属性的访问和修改，以便进行依赖追踪和触发更新。
+
+`reactive()` 将深层地转换对象：当访问嵌套对象时，它们也会被 `reactive()` 包装。当 ref 的值是一个对象时，`ref()` 也会在内部调用它。与浅层 ref 类似，这里也有一个 [`shallowReactive()`](https://cn.vuejs.org/api/reactivity-advanced.html#shallowreactive) API 可以选择退出深层响应性。
+
+### 生命周期
+
+![组件生命周期图示](./vue笔记.assets/lifecycle.16e4c08e.png)
+
+每个 Vue 组件实例在创建时都需要经历一系列的初始化步骤，比如设置好数据侦听，编译模板，挂载实例到 DOM，以及在数据改变时更新 DOM。在此过程中，它也会运行被称为生命周期钩子的函数，让开发者有机会在特定阶段运行自己的代码。
+
+**注册周期钩子**
+
+举例来说，`onMounted` 钩子可以用来在组件完成初始渲染并创建 DOM 节点后运行代码：
+
+```vue
+<script setup>
+import { onMounted } from 'vue'
+
+onMounted(() => {
+  console.log(`the component is now mounted.`)
+})
+</script>
+```
+
+### 组件基础
+
+#### 使用组件
+
+要使用一个子组件，我们需要在父组件中导入它。假设我们把计数器组件放在了一个叫做 `ButtonCounter.vue` 的文件中，这个组件将会以默认导出的形式被暴露给外部。
+
+```
+<script setup>
+import ButtonCounter from './ButtonCounter.vue'
+</script>
+
+<template>
+  <h1>Here is a child component!</h1>
+  <ButtonCounter />
+</template>
+```
+
+通过 `<script setup>`，导入的组件都在模板中直接可用。
+
+当然，你也可以全局地注册一个组件，使得它在当前应用中的任何组件上都可以使用，而不需要额外再导入。关于组件的全局注册和局部注册两种方式的利弊，我们放在了[组件注册](https://cn.vuejs.org/guide/components/registration.html)这一章节中专门讨论。
+
+组件可以被重用任意多次：
+
+```
+<h1>Here is a child component!</h1>
+<ButtonCounter />
+<ButtonCounter />
+<ButtonCounter />
+```
+
+在单文件组件中，推荐为子组件使用 `PascalCase` 的标签名，以此来和原生的 HTML 元素作区分。虽然原生 HTML 标签名是不区分大小写的，但 Vue 单文件组件是可以在编译中区分大小写的。我们也可以使用 `/>` 来关闭一个标签。
+
+如果你是**直接在 DOM 中**书写模板 (例如原生 `<template>` 元素的内容)，模板的编译需要遵从浏览器中 HTML 的解析行为。在这种情况下，你应该需要使用 `kebab-case` 形式并显式地关闭这些组件的标签。
+
+```
+<!-- 如果是在 DOM 中书写该模板 -->
+<button-counter></button-counter>
+<button-counter></button-counter>
+<button-counter></button-counter>
+```
+
+#### 传递 props
+
+**props是单向数据流，不能改变在子组件中改变props。**
+
+如果我们正在构建一个博客，我们可能需要一个表示博客文章的组件。我们希望所有的博客文章分享相同的视觉布局，但有不同的内容。要实现这样的效果自然必须向组件中传递数据，例如每篇文章标题和内容，这就会使用到 props。
+
+Props 是一种特别的 attributes，你可以在组件上声明注册。要传递给博客文章组件一个标题，我们必须在组件的 props 列表上声明它。这里要用到 [`defineProps`](https://cn.vuejs.org/api/sfc-script-setup.html#defineprops-defineemits) 宏：
+
+```
+<!-- BlogPost.vue -->
+<script setup>
+defineProps(['title'])
+</script>
+
+<template>
+  <h4>{{ title }}</h4>
+</template>
+```
+
+`defineProps` 是一个仅 `<script setup>` 中可用的编译宏命令，并不需要显式地导入。声明的 props 会自动暴露给模板。`defineProps` 会返回一个对象，其中包含了可以传递给组件的所有 props：
+
+```
+const props = defineProps(['title'])
+console.log(props.title)
+```
+
+TypeScript 用户请参考：[为组件 props 标注类型](https://cn.vuejs.org/guide/typescript/composition-api.html#typing-component-props)
+
+如果你没有使用 `<script setup>`，props 必须以 `props` 选项的方式声明，props 对象会作为 `setup()` 函数的第一个参数被传入：
+
+```
+export default {
+  props: ['title'],
+  setup(props) {
+    console.log(props.title)
+  }
+}
+```
+
+一个组件可以有任意多的 props，默认情况下，所有 prop 都接受任意类型的值。
+
+当一个 prop 被注册后，可以像这样以自定义 attribute 的形式传递数据给它：
+
+template
+
+```
+<BlogPost title="My journey with Vue" />
+<BlogPost title="Blogging with Vue" />
+<BlogPost title="Why Vue is so fun" />
+```
+
+在实际应用中，我们可能在父组件中会有如下的一个博客文章数组：
+
+js
+
+```
+const posts = ref([
+  { id: 1, title: 'My journey with Vue' },
+  { id: 2, title: 'Blogging with Vue' },
+  { id: 3, title: 'Why Vue is so fun' }
+])
+```
+
+这种情况下，我们可以使用 `v-for` 来渲染它们：
+
+template
+
+```
+<BlogPost
+  v-for="post in posts"
+  :key="post.id"
+  :title="post.title"
+ />
+```
+
+#### 监听事件
+
+子组件通过调用内置的 [**`$emit`** 方法](https://cn.vuejs.org/api/component-instance.html#emit)，通过传入事件名称来抛出一个事件，并通过 [`defineEmits`](https://cn.vuejs.org/api/sfc-script-setup.html#defineprops-defineemits) 宏来声明需要抛出的事件。在上级组件中声明被抛出的事件名，并确定处理方法`@enlarge-text="postFontSize += 0.1"`。
+
+App.vue：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import BlogPost from './BlogPost.vue'
+  
+const posts = ref([
+  { id: 1, title: 'My journey with Vue' },
+  { id: 2, title: 'Blogging with Vue' },
+  { id: 3, title: 'Why Vue is so fun' }
+])
+
+const postFontSize = ref(1)
+</script>
+
+<template>
+	<div :style="{ fontSize: postFontSize + 'em' }">
+    <BlogPost
+      v-for="post in posts"
+      :key="post.id"
+      :title="post.title"
+      @enlarge-text="postFontSize += 0.1"
+    ></BlogPost>
+  </div>
+</template>
+```
+
+BlogPost.vue：
+
+```vue
+<script setup>
+defineProps(['title'])
+defineEmits(['enlarge-text'])
+</script>
+
+<template>
+  <div class="blog-post">
+    <h4>{{ title }}</h4>
+    <button @click="$emit('enlarge-text')">Enlarge text</button>
+  </div>
+</template>
+```
+
+#### 插槽
+
+将 HTML 元素中的内容传递给组件内部
+
+App.vue：
+
+```vue
+<script setup>
+import AlertBox from './AlertBox.vue'
+</script>
+
+<template>
+	<AlertBox>
+  	Something bad happened.
+	</AlertBox>
+</template>
+```
+
+BlogPost.vue：
+
+```vue
+<template>
+  <div class="alert-box">
+    <strong>Error!</strong>
+    <br/>
+    <slot />
+  </div>
+</template>
+```
+
+#### 模板解析注意事项
+
+##### 大小写区分
+
+HTML 标签和属性名称是不分大小写的，所以浏览器会把任何大写的字符解释为小写。这意味着当你使用 DOM 内的模板时，无论是 PascalCase 形式的组件名称、camelCase 形式的 prop 名称还是 v-on 的事件名称，都需要转换为相应等价的 kebab-case (短横线连字符) 形式：
+
+js
+
+```
+// JavaScript 中的 camelCase
+const BlogPost = {
+  props: ['postTitle'],
+  emits: ['updatePost'],
+  template: `
+    <h3>{{ postTitle }}</h3>
+  `
+}
+```
+
+template
+
+```
+<!-- HTML 中的 kebab-case -->
+<blog-post post-title="hello!" @update-post="onUpdatePost"></blog-post>
+```
+
+##### 闭合标签
+
+我们在上面的例子中已经使用过了闭合标签 (self-closing tag)：
+
+template
+
+```
+<MyComponent />
+```
+
+这是因为 Vue 的模板解析器支持任意标签使用 `/>` 作为标签关闭的标志。
+
+然而在 DOM 内模板中，我们必须显式地写出关闭标签：
+
+template
+
+```
+<my-component></my-component>
+```
+
+这是由于 HTML 只允许[一小部分特殊的元素](https://html.spec.whatwg.org/multipage/syntax.html#void-elements)省略其关闭标签，最常见的就是 `<input>` 和 `<img>`。对于其他的元素来说，如果你省略了关闭标签，原生的 HTML 解析器会认为开启的标签永远没有结束，用下面这个代码片段举例来说：
+
+template
+
+```
+<my-component /> <!-- 我们想要在这里关闭标签... -->
+<span>hello</span>
+```
+
+将被解析为：
+
+template
+
+```
+<my-component>
+  <span>hello</span>
+</my-component> <!-- 但浏览器会在这里关闭标签 -->
+```
+
+##### 元素位置限制
+
+某些 HTML 元素对于放在其中的元素类型有限制，例如 `<ul>`，`<ol>`，`<table>` 和 `<select>`，相应的，某些元素仅在放置于特定元素中时才会显示，例如 `<li>`，`<tr>` 和 `<option>`。
+
+这将导致在使用带有此类限制元素的组件时出现问题。例如：
+
+template
+
+```
+<table>
+  <blog-post-row></blog-post-row>
+</table>
+```
+
+自定义的组件 `<blog-post-row>` 将作为无效的内容被忽略，因而在最终呈现的输出中造成错误。我们可以使用特殊的 [`is` attribute](https://cn.vuejs.org/api/built-in-special-attributes.html#is) 作为一种解决方案：
+
+template
+
+```
+<table>
+  <tr is="vue:blog-post-row"></tr>
+</table>
+```
+
+#### 动态组件
+
+有些场景会需要在两个组件间来回切换，比如 Tab 界面：
+
+[在演练场中查看示例](https://play.vuejs.org/#eNqNVMGOmzAQ/ZURe2BXCiHbrXpwk1X31mMPvS1V5RiTWAEb2SZNhPLvHdvggLZRE6TIM/P8/N5gpk/e2nZ57HhCkrVhWrQWDLdd+1pI0bRKW/iuGg6VVg2ky9wFDp7G8g9lrIl1H80Bb5rtxfFKMcRzUA+aV3AZQKEEhWRKGgus05pL+5NuYeNwj6mTkT4VckRYujVY63GT17twC6/Fr4YjC3kp5DoPNtEgBpY3bU0txwhgXYojsJoasymSkjeqSHweK9vOWoUbXIC/Y1YpjaDH3wt39hMI6TUUSYSQAz8jArPT5Mj+nmIhC6zpAu1TZlEhmXndbBwpXH5NGL6xWrADMsyaMj1lkAzQ92E7mvYe8nCcM24xZApbL5ECiHCSnP73KyseGnvh6V/XedwS2pVjv3C1ziddxNDYc+2WS9fC8E4qJW1W0UbUZwKGSpMZrkX11dW2SpdcE3huT2BULUp44JxPSpmmpegMgU/tyadbWpZC7jCxwj0v+OfTDdU7ITOrWiTjzTS3Vei8IfB5xHZ4PmqoObMEJHryWXXkuqrVn+xEgHZWYRKbh06uLyv4iQq+oIDnkXSQiwKymlc26n75WNdit78FmLWCMeZL+GKMwlKrhLRcBzhlh51WnSwJPFQr9/zLdIZ007w/O6bR4MQe2bseBJMzer5yzwf8MtzbOzYMkNsOY0+HfoZv1d+lZJGMg8fNqdsfbbio4b77uRVv7I0Li8xxZN1PHWbeHdyTWXc/+zgw/8t/+QsROe9h)
+
+上面的例子是通过 Vue 的 `<component>` 元素和特殊的 `is` attribute 实现的：
+
+template
+
+```
+<!-- currentTab 改变时组件也改变 -->
+<component :is="tabs[currentTab]"></component>
+```
+
+在上面的例子中，被传给 `:is` 的值可以是以下几种：
+
+- 被注册的组件名
+- 导入的组件对象
+
+你也可以使用 `is` attribute 来创建一般的 HTML 元素。
+
+当使用 `<component :is="...">` 来在多个组件间作切换时，被切换掉的组件会被卸载。我们可以通过 [`` 组件](https://cn.vuejs.org/guide/built-ins/keep-alive.html)强制被切换掉的组件仍然保持“存活”的状态。
+
+```vue
+<script setup>
+import Home from './Home.vue'
+import Posts from './Posts.vue'
+import Archive from './Archive.vue'
+import { ref } from 'vue'
+ 
+const currentTab = ref('Home')
+
+const tabs = {
+  Home,
+  Posts,
+  Archive
+}
+</script>
+
+<template>
+  <div class="demo">
+    <button
+       v-for="(_, tab) in tabs"
+       :key="tab"
+       :class="['tab-button', { active: currentTab === tab }]"
+       @click="currentTab = tab"
+     >
+      {{ tab }}
+    </button>
+	  <component :is="tabs[currentTab]" class="tab"></component>
+  </div>
+</template>
+```
+
 ### 数据代理
 
 <mark>数据代理：通过一个对象代理对另一个对象中属性的操作（读/写）</mark>
