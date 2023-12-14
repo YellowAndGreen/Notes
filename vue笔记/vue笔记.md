@@ -1267,7 +1267,27 @@ export default {
 }
 ```
 
+## Vite
 
+```
+$ npm create vite@latest
+```
+
+你还可以通过附加的命令行选项直接指定项目名称和你想要使用的模板。例如，要构建一个 Vite + Vue 项目，运行:
+
+```
+# npm 7+, extra double-dash is needed:
+npm create vite@latest my-vue-app -- --template vue
+
+# yarn
+yarn create vite my-vue-app --template vue
+
+# pnpm
+pnpm create vite my-vue-app --template vue
+
+# bun
+bunx create-vite my-vue-app --template vue
+```
 
 ## 注意
 
@@ -1292,6 +1312,95 @@ export default {
    ​                  (2). for(){}
 
 ## 其他
+
+### PWA
+
+基于Vite的项目加入PWA：
+
+要将PWA功能添加到基于Vite的Vue项目中，你可以按照以下步骤操作：
+
+1. **添加依赖**：首先，你需要安装`vite-plugin-pwa`。你可以使用以下命令进行安装：
+
+   ```
+   npm i vite-plugin-pwa -D
+   ```
+
+2. **修改配置**：在`vite.config.ts`文件中，你需要引入`vite-plugin-pwa`并在plugins中使用它。以下是一个示例：
+
+   ```ts
+   import { defineConfig } from 'vite'
+   import vue from '@vitejs/plugin-vue'
+   import { VitePWA } from 'vite-plugin-pwa'
+   
+   // https://vitejs.dev/config/
+   export default defineConfig({
+     base: './',
+     plugins: [vue(),
+       VitePWA({ // 使用PWA插件
+         manifest: { // 定义manifest.json
+           name: 'TODO LIST', // 应用的名称
+           short_name: 'TODO', // 应用的简短名称
+           description: 'My awesome PWA App', // 应用的描述
+           theme_color: '#0000FF', // 应用的主题颜色
+           icons: [ // 应用的图标
+             {
+               src: '/public/favicon.ico',
+               sizes: '32x32',
+               type: 'image/x-icon',
+             }
+           ],
+           registerType: "autoUpdate",
+           devOptions: {
+             enabled: true,
+           },
+           workbox: {
+             globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+           },
+         },
+       }),
+     ]
+   })
+   ```
+
+3. **添加Service Worker**：在主文件中加入Service Worker。以下是一个示例：
+
+   ```js
+   import { createApp } from 'vue';
+   import App from './App.vue'
+   import store from './store/store.js'
+   import router from './router/router.js'
+   
+   
+   // 检查浏览器是否支持Service Worker
+   if ('serviceWorker' in navigator) {
+       window.addEventListener('load', function() {
+         // 注册Service Worker
+         navigator.serviceWorker.register('./sw.js').then(function(registration) {
+           // 注册成功
+           console.log('ServiceWorker registration successful with scope: ', registration.scope);
+         }, function(err) {
+           // 注册失败
+           console.log('ServiceWorker registration failed: ', err);
+         });
+       });
+     }
+   
+   const app = createApp(App)
+   
+   app.use(store)
+   app.use(router)
+   app.mount('#app')
+   ```
+
+4. sw.js：
+
+```js
+// sw.js 文件
+self.addEventListener('fetch', function(event) {
+    // 使用fetch方法从网络获取资源
+    event.respondWith(fetch(event.request));
+  });
+```
 
 
 
@@ -2020,4 +2129,8 @@ const MyReusableModule = {
   // mutations, actions, getters...
 }
 ```
+
+
+
+# 
 
