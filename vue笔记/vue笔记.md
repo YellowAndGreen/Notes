@@ -29,6 +29,63 @@ async function fetchUser(userId) {
 
 在这个例子中，`fetchUser` 函数是一个异步函数，它使用 `await` 关键字等待 `fetch` 函数的结果。当 `fetch` 函数返回一个 promise 时，`await` 会暂停 `fetchUser` 函数的执行，直到 promise 完成。然后，它会继续执行 `fetchUser` 函数，并使用 promise 的结果值。
 
+### Promise
+
+`Promise` 是 JavaScript 中的一个内置对象，它用于处理异步操作。一个 `Promise` 在创建时接受一个函数作为参数，这个函数接受两个参数：`resolve` 和 `reject`，分别表示异步操作成功和失败的回调函数。`Promise`会返回Promise实例，因此支持链式写法。
+
+- `.then()` 方法接受两个参数，都是可选的：
+  1. `onFulfilled`：当 `Promise` 对象的状态变为 `fulfilled`（已成功）时，这个函数会被调用。它接受一个参数，即 `resolve` 函数传递的值。
+  2. `onRejected`：当 `Promise` 对象的状态变为 `rejected`（已失败）时，这个函数会被调用。它接受一个参数，即 `reject` 函数传递的值。
+- `.catch()` 方法接受一个参数：
+  1. `onRejected`：当 `Promise` 对象的状态变为 `rejected`（已失败）时，这个函数会被调用。它接受一个参数，即 `reject` 函数传递的值。
+
+```js
+// 模拟像后台请求数据
+const post = (params) => {
+  // 返回一个新的 Promise 对象
+  return new Promise((resolve, reject) => {
+    // 从参数中解构出 account 和 password
+    const { account, password } = params;
+    // 从 localStorage 中获取名为 "db_user" 的项
+    let db_user = localStorage.getItem("db_user");
+    // 如果该项存在，则将其解析为 JavaScript 对象
+    if (db_user) {
+      db_user = JSON.parse(db_user);
+    } else {
+      // 如果该项不存在，则初始化为一个空数组
+      db_user = [];
+    }
+    // 在 db_user 数组中查找是否有与 account 相同的项
+    if (!db_user.find((v) => v.account === account)) {
+      // 如果没有找到，则将新的用户信息添加到数组中
+      db_user.push({ account, password });
+
+      // 将更新后的数组保存到 localStorage 中
+      localStorage.setItem("db_user", JSON.stringify(db_user));
+
+      // 使用 resolve 函数返回成功的结果
+      resolve({ msg: '注册成功！' });
+    } else {
+      // 如果找到了与 account 相同的项，则使用 reject 函数返回失败的结果
+      reject({ msg: `用户名：${account}已存在！` });
+    }
+  });
+};
+// 调用 post 函数，并处理返回的 Promise 对象
+post(this.form)
+  .then((res) => {
+    // 如果 Promise 对象的状态变为 fulfilled（已成功），则执行此回调函数
+    alert(`${res.msg}用户名：${this.form.account},密码： ${this.form.password}`);
+    this.$router.push("/");
+  })
+  .catch((err) => {
+    // 如果 Promise 对象的状态变为 rejected（已失败），则执行此回调函数
+    alert(err.msg);
+  });
+```
+
+
+
 ## 基础知识
 
 Vue.config：全局配置
@@ -1178,6 +1235,30 @@ template
   - 接收的数据可以是：基本类型、也可以是对象类型。
   - 基本类型的数据：响应式依然是靠``Object.defineProperty()``的```get```与```set```完成的。
   - 对象类型的数据：内部 <i style="color:gray;font-weight:bold">“ 求助 ”</i> 了Vue3.0中的一个新函数—— ```reactive```函数。
+- 模板的ref属性：`ref` 属性用于注册元素或子组件的引用。
+
+​	使用选项式 API，引用将被注册在组件的 `this.$refs` 对象里：
+
+```
+<!-- 存储为 this.$refs.p -->
+<p ref="p">hello</p>
+```
+
+使用组合式 API，引用将存储在与名字匹配的 ref 里：
+
+```
+<script setup>
+import { ref } from 'vue'
+
+const p = ref()
+</script>
+
+<template>
+  <p ref="p">hello</p>
+</template>
+```
+
+`this.$refs` 也是非响应式的，因此你不应该尝试在模板中使用它来进行数据绑定。
 
 ### 3.reactive函数
 
