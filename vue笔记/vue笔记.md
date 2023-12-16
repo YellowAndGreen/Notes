@@ -1222,7 +1222,7 @@ vite官网：https://vitejs.cn
 
 ```bash
 ## 创建工程
-npm init vite-app <project-name>
+npm init vite-app <project-name> -- --template vue
 ## 进入工程目录
 cd <project-name>
 ## 安装依赖
