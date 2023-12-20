@@ -1304,6 +1304,8 @@ vite官网：https://vitejs.cn
 ```bash
 ## 创建工程
 npm init vite-app <project-name> -- --template vue
+npm init vite-app contract_generator_vue -- --template vue
+yarn create vite contract_generator_vue --template vue
 ## 进入工程目录
 cd <project-name>
 ## 安装依赖
@@ -1348,27 +1350,30 @@ export default {
 }
 ```
 
-## Vite
+### Element Plus
+
+安装：
 
 ```
-$ npm create vite@latest
+npm install element-plus --save
 ```
 
-你还可以通过附加的命令行选项直接指定项目名称和你想要使用的模板。例如，要构建一个 Vite + Vue 项目，运行:
+完整引入：
 
+```ts
+// main.ts
+import { createApp } from 'vue'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import App from './App.vue'
+
+const app = createApp(App)
+
+app.use(ElementPlus)
+app.mount('#app')
 ```
-# npm 7+, extra double-dash is needed:
-npm create vite@latest my-vue-app -- --template vue
 
-# yarn
-yarn create vite my-vue-app --template vue
 
-# pnpm
-pnpm create vite my-vue-app --template vue
-
-# bun
-bunx create-vite my-vue-app --template vue
-```
 
 ## 注意
 
