@@ -698,6 +698,7 @@ from __future__ import print_function
 import sys
 import rospy
 from beginner_tutorials.srv import *
+
 def add_two_ints_client(x, y):
     # 在add_two_ints服务可用之前一直阻塞。
     rospy.wait_for_service('add_two_ints')
@@ -708,8 +709,10 @@ def add_two_ints_client(x, y):
         return resp1.sum
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
+        
 def usage():
     return "%s [x y]"%sys.argv[0]
+
 if __name__ == "__main__":
     if len(sys.argv) == 3:
         x = int(sys.argv[1])
