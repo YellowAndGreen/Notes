@@ -6,6 +6,7 @@
 4. 内部变量以\_开头：_var = "_single_leading_underscore"
 5. 类私有变量以\_\_开头：__var = " __double_leading_underscore"
 6. 不需要的变量为\_
+7. 使用PEP8：加入vscode插件autopep
 
 ### 经验
 
@@ -14,8 +15,7 @@
 
 #### 操作符
 
-is 和 is not 在判断时比较的是两个变量引用对象的内存地址，而 == 和 != 则比较的是引用对象的值。<br>
-***判断一个值是不是None时，最好使用is和is not***
+is 和 is not 在判断时比较的是两个变量引用对象的内存地址，而 == 和 != 则比较的是引用对象的值。判断一个值是不是None时，最好使用is和is not
 
 
 ```python
@@ -75,40 +75,14 @@ a is b,a==b
 
     12
 
+#### 包管理
 
-
-#### The Zen Of Python
-
-
-```python
-import this
+```
+pip freeze > requirements.txt
 ```
 
-    The Zen of Python, by Tim Peters
-    
-    Beautiful is better than ugly.
-    Explicit is better than implicit.
-    Simple is better than complex.
-    Complex is better than complicated.
-    Flat is better than nested.
-    Sparse is better than dense.
-    Readability counts.
-    Special cases aren't special enough to break the rules.
-    Although practicality beats purity.
-    Errors should never pass silently.
-    Unless explicitly silenced.
-    In the face of ambiguity, refuse the temptation to guess.
-    There should be one-- and preferably only one --obvious way to do it.
-    Although that way may not be obvious at first unless you're Dutch.
-    Now is better than never.
-    Although never is often better than *right* now.
-    If the implementation is hard to explain, it's a bad idea.
-    If the implementation is easy to explain, it may be a good idea.
-    Namespaces are one honking great idea -- let's do more of those!
 
 
-对于Complex is better than complicated的理解：
-![image.png](attachment:image.png)
 
 ### 标准模块
 
@@ -125,8 +99,8 @@ argparse的使用简化成下面四个步骤
 4：parser.parse_args()
 
 上面四个步骤解释如下：首先导入该模块；然后创建一个解析对象；然后向该对象中添加你要关注的命令行参数和选项，每一个add_argument方法对应一个你要关注的参数或选项；最后调用parse_args()方法进行解析；解析成功之后即可使用。
-<br>
-**下面的例子中输入`python test.py -h`会显示帮助文档，输入--addresses xxx会按照程序执行所需的操作**
+
+下面的例子中输入`python test.py -h`会显示帮助文档，输入--addresses xxx会按照程序执行所需的操作**
 
 
 ```python
@@ -149,50 +123,29 @@ if __name__ == '__main__':
     print(args.addresses)            #直接这么获取即可。
 ```
 
-### 列表生成式
-
-
-```python
-# 生成整数的平方数组
-a= [n*n for n in range(1,11)]
-print(a)
-```
-
-    [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
-
-
-
-```python
-# 字符串整理，可以使用函数
-d = {'x': 'A', 'y': 'B', 'z': 'C' }
-[k + '=' + v for k, v in d.items()]
-```
-
-
-
-
-    ['x=A', 'y=B', 'z=C']
-
-
-
-
-```python
-# 有判断功能
-
-#此处不能使用else
-a = [x for x in range(1, 11) if x % 2 == 0] 
-#此处可以使用else
-b = [x if x % 2 == 0 else -x for x in range(1, 11)]
-
-print(a,b)
-```
-
-    [2, 4, 6, 8, 10] [-1, 2, -3, 4, -5, 6, -7, 8, -9, 10]
 
 
 ### 生成器
 
-函数传参的时候使用生成器可以减小内存占用
++ 最基础的生成器表达式的语法跟列表推导差不多，只是把方括号换成圆括号
++ 如果生成器表达式是一个函数调用过程中的唯一参数，那么不需要额外再用括号把它围起来。
+
+```py
+>>> symbols = '$¢£¥€¤'
+>>> tuple(ord(symbol) for symbol in symbols) ➊
+(36, 162, 163, 165, 8364, 164)
+>>> import array
+>>> array.array('I', (ord(symbol) for symbol in symbols)) ➋
+array('I', [36, 162, 163, 165, 8364, 164])
+```
+
++ 调用生成器函数会返回一个生成器对象（在函数体内有yield就会被识别为生成器函数）
++ 只有对生成器对象调用next时，才会真正执行函数体内代码
++ 当yield后，函数会暂停在yield的下面一行，下次调用next时接在下面执行
++ 生成器和迭代器的区别就在于不需要保存当前进度的状态，只需要接着去运行即可
++ 可以通过send方法在yield一个值后赋予yield值
+
++ 函数传参的时候使用生成器可以**减小内存占用**
 
 
 ```python
@@ -202,30 +155,21 @@ def sample():
     yield 'Not'
     yield 'Chicago?'
 ''.join(sample())
+# 'IsChicagoNotChicago?'
 ```
 
+**列表生成式和生成器的区别仅在于最外层的[]和()**
 
-
-
-    'IsChicagoNotChicago?'
-
-
+生成器不会直接计算出所有结果，只有通过g.next()或者for循环获得下一个返回值：
 
 
 ```python
-# 列表生成式和生成器的区别仅在于最外层的[]和()
-# 生成器不会直接计算出所有结果，只有通过g.next()
-# 或者for循环获得下一个返回值
 g = (x * x for x in range(3))
 for n in g:
     print(n)
 ```
 
-    0
-    1
-    4
-
-
+**暂停示例：**
 
 ```python
 # 函数生成器,yield会返回值
@@ -241,12 +185,218 @@ for i in o:
     print(i)
 ```
 
-    step 1
-    1
-    step 2
-    3
-    step 3
-    5
+**yield from：**
+
++ 允许你将一个可迭代对象的元素直接“传递”给上层的迭代器或生成器。
++ 它的作用是将一个嵌套的可迭代对象（例如列表的列表）展平为一个单一的序列。
+
+```py
+class Node:
+    def __init__(self, value):
+        self._value = value
+        self._children = []
+
+    def __repr__(self):
+        return 'Node({!r})'.format(self._value)
+
+    def add_child(self, node):
+        self._children.append(node)
+
+    def __iter__(self):
+        return iter(self._children)
+
+    def depth_first(self):
+        yield self
+        for c in self:
+            yield from c.depth_first()
+
+# Example
+if __name__ == '__main__':
+    root = Node(0)
+    child1 = Node(1)
+    child2 = Node(2)
+    root.add_child(child1)
+    root.add_child(child2)
+    child1.add_child(Node(3))
+    child1.add_child(Node(4))
+    child2.add_child(Node(5))
+
+    for ch in root.depth_first():
+        print(ch)
+    # Outputs Node(0), Node(1), Node(3), Node(4), Node(2), Node(5)
+```
+
+
+
+### 变量
+
+#### 字符串
+
+- 使用**格式化字符串字面值**，要在字符串开头的引号/三引号前添加 `f` 或 `F` 。在这种字符串中，可以在 `{` 和 `}` 字符之间输入引用的变量，或字面值的 Python 表达式。
+
+  ```
+  >>> year = 2016
+  >>> event = 'Referendum'
+  >>> f'Results of the {year} {event}'
+  'Results of the 2016 Referendum'
+  ```
+
+- 字符串的 [`str.format()`](https://docs.python.org/zh-cn/3.8/library/stdtypes.html#str.format) 方法需要更多手动操作。该方法也用 `{` 和 `}` 标记替换变量的位置，虽然这种方法支持详细的格式化指令，但需要提供格式化信息。
+
+  ```
+  >>> yes_votes = 42_572_654
+  >>> no_votes = 43_132_495
+  >>> percentage = yes_votes / (yes_votes + no_votes)
+  >>> '{:-9} YES votes  {:2.2%}'.format(yes_votes, percentage)
+  ' 42572654 YES votes  49.67%'
+  ```
+
+- **格式说明符**
+
+使用 `:` 后跟 `.` 和所需的小数位数来设置小数点后的位数。例如，如果你想将数字格式化为保留两位小数，可以这样做：
+
+```python
+num = 3.1415926
+formatted_str = f"{num:.2f}"
+print(formatted_str)  # 输出: "3.14"
+```
+
+这里的 `.2f` 表示以浮点数格式显示，保留两位小数。
+
+此外，如果需要设置宽度和精度，可以这样写：
+
+```python
+formatted_str = f"{num:10.3f}"  # 宽度为10，小数点后保留3位
+print(formatted_str)  # 输出: "     3.142"
+```
+
+在这个例子中，`10.3f` 表示总宽度为10个字符，其中3位是小数点后的数字，其余的用空格填充。
+
+**整数格式化**的例子：
+
+1. **设置宽度**:
+   使用数字指定宽度，如果整数位数小于这个宽度，将会用空格填充。
+
+   ```python
+   num = 123
+   print(f"{num:5}")  # 输出: "  123"
+   ```
+
+2. **设置填充字符**:
+   使用 `{:<填充字符>宽度}` 来指定填充字符和宽度。
+
+   ```python
+   print(f"{num:->10}")  # 输出: "123     "
+   print(f"{num:0>10}")  # 输出: "000000123"
+   ```
+
+3. **设置对齐方式**:
+
+   - `<` 表示左对齐（默认）
+   - `>` 表示右对齐
+   - `^` 表示居中对齐
+
+   ```python
+   print(f"{num:<10}")  # 输出: "123      "
+   print(f"{num:>10}")  # 输出: "      123"
+   print(f"{num:^10}")  # 输出: "   123   "
+   ```
+
+4. **添加小数点并填充零**:
+   如果你想在整数后面添加小数点并填充零，可以使用 `:.0f` 格式化，这将把整数转换为浮点数并去掉小数部分。
+
+   ```python
+   print(f"{num:.0f}")  # 输出: "123."
+   ```
+
+5. **使用逗号分隔千位**:
+   对于较大的整数，可以使用逗号作为千位分隔符。
+
+   ```python
+   big_num = 123456789
+   print(f"{big_num:,}")  # 输出: "123,456,789"
+   ```
+
+#### global和nonlocal
+
+`global` 关键字用于在函数内部声明变量为全局变量，允许对其全局状态进行修改；而 `nonlocal` 关键字用于在嵌套的函数中声明变量为最近封闭作用域中的非局部变量，允许对其值进行修改。
+
+```py
+def scope_test():
+    def do_local():
+        spam = "local spam"
+
+    def do_nonlocal():
+        nonlocal spam
+        spam = "nonlocal spam"
+
+    def do_global():
+        global spam
+        spam = "global spam"
+
+    spam = "test spam"
+    do_local()
+    print("After local assignment:", spam)
+    do_nonlocal()
+    print("After nonlocal assignment:", spam)
+    do_global()
+    print("After global assignment:", spam)
+
+scope_test()
+print("In global scope:", spam)
+```
+
+示例代码的输出是：
+
+```py
+After local assignment: test spam
+After nonlocal assignment: nonlocal spam
+After global assignment: nonlocal spam
+In global scope: global spam
+```
+
+#### 弱引用
+
+在Python中，弱引用（weak reference）是一种对对象的引用，它**不会增加对象的引用计数**。这意味着，即使存在弱引用，当对象的其他所有强引用被删除时，对象仍然可以被垃圾回收器回收。弱引用主要用于避免内存泄漏，尤其是在管理缓存或处理对象集合时，这些对象可能会被外部频繁地创建和销毁。
+
+弱引用的一个典型应用场景是缓存机制，例如，一个函数可能会缓存其结果以避免重复计算。如果使用强引用来存储这些结果，可能会导致内存泄漏，因为即使不再需要这些结果，它们仍然会被缓存对象引用而无法被回收。使用弱引用可以确保当缓存的对象不再被其他地方使用时，它们可以被自动回收。
+
+Python提供了`weakref`模块来支持弱引用。以下是使用弱引用的一些基本示例：
+
+1. 创建弱引用：
+   ```python
+   import weakref
+   
+   class MyClass:
+       pass
+   
+   obj = MyClass()
+   ref = weakref.ref(obj)
+   ```
+
+2. 检查弱引用是否仍然有效：
+   ```python
+   if ref() is not None:
+       print("对象还存在")
+   else:
+       print("对象已经被垃圾回收")
+   ```
+
+3. 使用弱引用调用对象的方法：
+   ```python
+   if ref() is not None:
+       ref().my_method()
+   ```
+
+4. 弱引用集合（`weakref.WeakSet`）和弱引用字典（`weakref.WeakValueDictionary`）：
+   ```python
+   refs = weakref.WeakSet()
+   refs.add(obj)
+   
+   weak_dict = weakref.WeakValueDictionary()
+   weak_dict['key'] = obj
+   ```
+
 
 
 ### 函数
@@ -284,35 +434,18 @@ help(example)
 
 ​    
 
-#### 只能通过关键字调用：使用*分隔
+#### 使用`*`和`/`分隔
 
-1. *号之后均只能通过关键字调用
-
-
-```python
-def f(a, b, *, kw):
-    print(a, b, kw)
-f(1, 2, kw=3)
+```py
+def f(pos1, pos2, /, pos_or_kwd, *, kwd1, kwd2):
 ```
 
-    1 2 3
+说明：
 
-
-
-```python
-f(1, 2, 3)
-```
-
-
-    ---------------------------------------------------------------------------
-    
-    TypeError                                 Traceback (most recent call last)
-    
-    <ipython-input-8-1c2a18ab906a> in <module>
-    ----> 1 f(1, 2, 3)
-
-
-    TypeError: f() takes 2 positional arguments but 3 were given
+- `\`之前只能使用位置形参，`*`号之后均只能通过关键字调用
+- 使用仅限位置形参，可以让用户无法使用形参名。形参名没有实际意义时，强制调用函数的实参顺序时，或同时接收位置形参和关键字时，这种方式很有用。
+- 当形参名有实际意义，且显式名称可以让函数定义更易理解时，阻止用户依赖传递实参的位置时，才使用关键字。
+- 对于 API，使用仅限位置形参，可以防止未来修改形参名时造成破坏性的 API 变动。
 
 
 #### 类型注解
@@ -548,7 +681,7 @@ def count2():
     time.sleep(0.01)
 ```
 
-#### 多进程
+#### 多线程
 
 
 ```python
@@ -558,36 +691,24 @@ def test_thread():
     t2=Thread(target=count1,args=(100000,))
     t1.start()
     t2.start()
-    t1.join()
+    if t1.is_alive():  # 判断进程是否运行
+        print('Still running')
+    else:
+        print('Completed')
+    t1.join()  # 主线程会等待t1执行结束
     t2.join()
+    
+# 后台线程
+t = Thread(target=countdown, args=(10,), daemon=True)
+t.start()
 ```
+
+#### 多进程
+
+**`multiprocessing`在程序内部执行并行**
 
 
 ```python
-%%timeit
-test_thread()
-```
-
-    16.6 ms ± 196 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-
-
-```python
-%%timeit
-count1(100000)
-```
-
-    7.78 ms ± 119 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-
-
-```python
-#### 多线程
-```
-
-
-```python
-%%timeit
 from multiprocessing import Process
 def test_process():
     t1=Process(target=count1,args=(100000,))
@@ -598,7 +719,23 @@ def test_process():
     t2.join()
 ```
 
-    664 ns ± 12.3 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
+**`subprocess`用于运行和管理外部进程**
+
+```py
+import subprocess
+
+# 创建子进程但不等待其完成
+process = subprocess.Popen(["ping", "localhost"], stdout=subprocess.PIPE)
+
+# 从子进程获取输出
+output, _ = process.communicate()
+print(output.decode())
+
+# 使用shell模式
+proc = subprocess.Popen('bash rosplay.sh  > ./log/rosplay.log 2>&1', env=copy_env, shell=True)
+```
+
+
 
 
 ### 面向对象编程
@@ -750,6 +887,7 @@ ex.stmethod(),example.stmethod()
 ##### 抽象方法
 
 + 定义一个不需要实现的方法，类似于接口
++ 继承该类的子类必须实现该抽象方法
 
 
 ```python
@@ -1622,79 +1760,43 @@ print("__doc__:  ", test.__doc__)
     __doc__:   this is test __doc__
 
 
-#### 生成器
 
-+ 调用生成器函数会返回一个生成器对象（在函数体内有yield就会被识别为生成器函数）
-+ 只有对生成器对象调用next时，才会真正执行函数体内代码
-+ 当yield后，函数会暂停在yield的下面一行，下次调用next时接在下面执行
-+ 生成器和迭代器的区别就在于不需要保存当前进度的状态，只需要接着去运行即可
-+ 可以通过send方法在yield一个值后赋予yield值
+#### 抽象基类
 
+`from abc import ABC, abstractmethod` 是 Python 编程语言中使用抽象基类（Abstract Base Classes，简称 ABC）的一种方式。在 Python 中，`abc` 模块提供了基础设施，使得开发者可以创建抽象基类，这些类不能被实例化，但可以作为其他类的基类，以确保派生类实现了某些方法。
 
-```python
-def gener(num):
-    while num>0:
-        yield num
-        num-=1
-for i in gener(3):
-    print(i)
-```
+1. `ABC` 是一个元类，它可以用来创建抽象基类。当你将一个类继承自 `ABC` 时，这个类就成为了一个抽象基类。
 
-    3
-    2
-    1
+2. `abstractmethod` 是一个装饰器，用于将方法声明为抽象方法。抽象方法是一种没有实现体的方法，它必须在任何非抽象的子类中被重写。如果子类没有重写这些抽象方法，那么子类也会被认为是抽象的，不能被实例化。
 
-
+下面是一个简单的例子来说明如何使用 `ABC` 和 `abstractmethod`：
 
 ```python
-g = gener(3)
-# g.next()
-next(g)
-```
+from abc import ABC, abstractmethod
 
-
-
-
-    3
-
-
-
-
-```python
-def gener(num):
-    while num>0:
-        tmp = yield num
-        num-=1
-        if tmp == True:
-            return
-g= gener(10)
-for i in g:
-    if i<5:
-        g.send(True)
-    print(i)
-```
-
-    10
-    9
-    8
-    7
-    6
-    5
-
-
-
-    ---------------------------------------------------------------------------
+# 创建一个抽象基类
+class MyAbstractClass(ABC):
     
-    StopIteration                             Traceback (most recent call last)
+    # 声明一个抽象方法
+    @abstractmethod
+    def my_method(self):
+        pass
+
+# 子类必须实现抽象方法
+class MyConcreteClass(MyAbstractClass):
     
-    <ipython-input-7-2d8838972a7e> in <module>
-          8 for i in g:
-          9     if i<5:
-    ---> 10         g.send(True)
-         11     print(i)
+    def my_method(self):
+        print("Method implemented in MyConcreteClass")
 
+# 尝试实例化抽象基类会抛出异常
+# my_abstract_instance = MyAbstractClass()  # 这会抛出 TypeError
 
-    StopIteration: 
+# 实例化实现了抽象方法的子类是允许的
+my_concrete_instance = MyConcreteClass()
+my_concrete_instance.my_method()  # 输出: Method implemented in MyConcreteClass
+```
+
+在这个例子中，`MyAbstractClass` 是一个抽象基类，它包含了一个抽象方法 `my_method`。任何继承自 `MyAbstractClass` 的子类都必须实现 `my_method` 方法，否则它们也将是抽象类。`MyConcreteClass` 是一个实现了 `my_method` 方法的非抽象类，因此可以被实例化。
 
 
 ### 错误处理
@@ -1741,7 +1843,7 @@ def main():
 
 ### 文件与系统模块
 
-#### 文件和目录
+#### OS模块
 
 1. os.name——判断现在正在实用的平台，Windows 返回 ‘nt'; Linux 返回’posix'
 
@@ -1761,122 +1863,126 @@ def main():
 
 12. os.path.isdir()——判断指定对象是否为目录。是True,否则False。
 
+13. os.environ()——返回返回当前环境变量列表
 
-```python
-import os
-```
-
-
-```python
-os.name
-```
+14. `os.system(command)`: 执行指定的 shell 命令。
 
 
+#### shutil模块
 
+1. **shutil.copy(src, dst)**:
+   复制单个文件。copy2能够保留修改时间等元数据。
 
-    'nt'
+   ```python
+   import shutil
+   shutil.copy('/path/to/source_file', '/path/to/destination_file')
+   ```
 
+2. **shutil.rmtree(path)**:
+   递归删除目录及其内容。
 
+   ```python
+   import shutil
+   shutil.rmtree('/path/to/directory')
+   ```
 
+3. **shutil.move(src, dst)**:
+   移动文件或目录。
 
-```python
-os.getcwd()
-```
+   ```python
+   import shutil
+   shutil.move('/path/to/source', '/path/to/destination')
+   ```
 
+4. **shutil.copytree(src, dst, symlinks=False)**:
+   递归复制整个目录树。
 
+   ```python
+   import shutil
+   shutil.copytree('/path/to/source_directory', '/path/to/destination_directory')
+   ```
 
+5. **shutil.make_archive(base_name, format, root_dir=None, base_dir=None)**:
+   创建归档文件。
 
-    'C:\\Users\\60234\\python'
-
-
-
-
-```python
-os.listdir()
-```
-
-
-
-
-    ['.ipynb_checkpoints',
-     'baostock.ipynb',
-     'candlestick.html',
-     'HMM.ipynb',
-     'ml_ch2.ipynb',
-     'pds.ipynb',
-     'pyecharts.ipynb',
-     'Python.ipynb',
-     'Python.zip',
-     'Python基础.ipynb',
-     'R基础.ipynb',
-     'R统计.ipynb',
-     'STOCK.ipynb',
-     'stock_swarm.ipynb',
-     'test.ipynb',
-     'Untitled.ipynb',
-     'Untitled1.ipynb',
-     '存档',
-     '数据分析',
-     '数据分析1.ipynb',
-     '深度学习',
-     '股票数据.ipynb',
-     '词汇分析.ipynb',
-     '进度条.ipynb',
-     '驾驶意图']
-
-
-
-
-```python
-os.system('echo 12')
-```
-
-
-
-
-    0
-
-
-
-
-```python
-os.path.join("datasets", "housing")
-```
-
-
-
-
-    'datasets\\housing'
+   ```python
+   import shutil
+   shutil.make_archive('archive_name', 'zip', '/path/to/directory_to_zip')
+   ```
 
 
 
 #### 文件读写
 
+1. **open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)**:
+   - `file`: 文件路径或文件描述符。
+   - `mode`: 打开文件的模式，常见的有：
+     - `'r'`: 读取模式，默认值。
+     - `'w'`: 写入模式，会覆盖文件内容。
+     - `'a'`: 追加模式，写入数据到文件末尾。
+     - `'b'`: 二进制模式，与文本模式相对。
+     - `'+'`: 更新模式，可以读取也可以写入。
+   - `encoding`: 指定文件的编码。
+   - `errors`: 指定如何处理编码错误。
+   - `newline`: 控制何时写入换行符。
+   - `closefd`: 是否在文件操作完成后关闭文件描述符。
+   - `opener`: 指定一个可调用对象来打开文件。
+
+2. **read([size])**:
+   从文件中读取数据，`size` 指定要读取的字节数或字符数。
+
+3. **readline([size])**:
+   读取文件的一行，`size` 指定最大字节数或字符数。
+
+4. **readlines([sizehint])**:
+   读取文件的所有行，返回一个包含每行作为元素的列表。
+
+5. **write(str)**:
+   将字符串 `str` 写入文件。
+
+6. **writelines(sequence)**:
+   将序列 `sequence` 中的每个字符串写入文件。
+
+7. **seek(offset[, whence])**:
+   设置文件当前位置，`offset` 是偏移量，`whence` 指定偏移基准点（0 为文件开头，1 为当前位置，2 为文件末尾）。
+
+8. **tell()**:
+   返回文件当前位置。
+
+9. **close()**:
+   关闭文件，释放系统资源。
+
+10. **flush()**:
+    刷新文件的缓冲区。
+
+11. **truncate([size])**:
+    截断文件到 `size` 字节或字符，如果未指定 `size`，则截断到当前文件位置。
+
+12. **isatty()**:
+    判断文件是否是一个终端。
+
+以下是一些文件读写的示例：
 
 ```python
-with open('/path/to/file', 'r') as f:
-    print(f.read())
+# 打开文件
+with open('example.txt', 'w') as file:
+    file.write('Hello, World!\n')
+
+# 读取文件
+with open('example.txt', 'r') as file:
+    content = file.read()
+    print(content)
+
+# 逐行读取文件
+with open('example.txt', 'r') as file:
+    for line in file:
+        print(line, end='')
+
+# 写入多行到文件
+lines = ['First line.', 'Second line.', 'Third line.']
+with open('example.txt', 'w') as file:
+    file.writelines(lines)
 ```
-
-二、写模式 w 和写读模式 w+
-
-1、写模式
-
-写模式w特点：（1）只能写，不能读；（2）写的时候会把原来文件的内容清空；（3）当文件不存在时，会创建新文件。
-2、写读模式 w+
-
-写读模式w+特点：（1）可以写，也可以读；（2）写的时候会把原来文件的内容清空；（3）当文件不存在时，会创建新文件。
-
-三、追加模式a和追加读模式a+
-
-1、追加模式a
-
-追加模式a特点：（1）不能读；（2）可以写，是追加写，即在原内容末尾添加新内容；（3）当文件不存在时，创建新文件。
-2、追加读a+模式
-
-追加读a+模式特点：（1）可读可写；（2）写的时候是追加写，即在原内容末尾添加新内容；（3）当文件不存在时，创建新文件。
-
-![image.png](attachment:image.png)
 
 #### 系统sys模块
 
@@ -1884,68 +1990,30 @@ with open('/path/to/file', 'r') as f:
 + 获取python版本  sys.version    也可使用python -V
 + 获取对象的内存字节占用量  sys.getsizeof()
 
+`sys` 是 Python 的一个标准库模块，提供与 Python 解释器及其环境交互的功能。它经常用于访问与 Python 解释器相关的变量和函数，执行系统命令，以及处理脚本参数等。以下是 `sys` 模块中一些常用的组件和功能：
 
-```python
-import sys
-a = [1,2,3]
-sys.getrefcount(a)
-```
-
-
-
-
-    2
-
-
-
-
-```python
-b=a
-sys.getrefcount(a)
-```
-
-
-
-
-    3
-
-
-
-
-```python
-sys.version
-```
-
-
-
-
-    '3.8.8 (default, Apr 13 2021, 15:08:03) [MSC v.1916 64 bit (AMD64)]'
-
-
-
-
-```python
-sys.version_info
-```
-
-
-
-
-    sys.version_info(major=3, minor=8, micro=8, releaselevel='final', serial=0)
-
-
-
-
-```python
-sys.getsizeof(range(100000000))
-```
-
-
-
-
-    48
-
-
+1. **sys.argv**:
+   - 一个列表，包含命令行参数。第一个元素是脚本名称，随后的元素是传递给脚本的参数。
+2. **sys.exit(*args, **kwargs)**:
+   - 退出程序。如果提供参数，可以指定退出状态码。
+3. **sys.path**:
+   - 一个字符串列表，表示 Python 解释器搜索模块的路径。
+4. **sys.modules**:
+   - 一个字典，包含已经加载的模块。
+5. **sys.stdin, sys.stdout, sys.stderr**:
+   - 分别是标准输入、标准输出和标准错误输出的文件对象。
+6. **sys.maxsize**:
+   - 表示可以在 Python 中使用的最大的整数。
+7. **sys.getsizeof(obj)**:
+   - 返回对象 `obj` 的内存大小。
+9. **sys.exc_info()**:
+   - 返回一个元组，包含当前的异常信息，如果没有异常则返回 `None`。
+10. **sys.platform**:
+    - 一个字符串，表示正在运行的操作系统平台。
+11. **sys.version**:
+    - 包含 Python 解释器的版本信息。
+12. **sys.executable**:
+    - Python 解释器的路径。
 
 ### CookBook
 
@@ -1971,7 +2039,7 @@ name, shares
 
 #### 占位符变量_
 
-#### *号符： 
+#### *号符
 
 + 将列表分为多个单变量参数
 + 在赋值时为一个可变列表，也可以操作字符串
@@ -2171,6 +2239,78 @@ values
 
 
 #### 列表操作
+
+##### 切片对象
+
+可以用来形象化表明切片区域的用途，同时可复用
+
+```py
+>>> invoice = """
+... 0.....6................................40........52...55........
+30 ｜ 第2 章
+... 1909 Pimoroni PiBrella $17.50 3 $52.50
+... 1489 6mm Tactile Switch x20 $4.95 2 $9.90
+... 1510 Panavise Jr. - PV-201 $28.00 1 $28.00
+... 1601 PiTFT Mini Kit 320x240 $34.95 1 $34.95
+... """
+>>> SKU = slice(0, 6)
+>>> DESCRIPTION = slice(6, 40)
+>>> UNIT_PRICE = slice(40, 52)
+>>> QUANTITY = slice(52, 55)
+>>> ITEM_TOTAL = slice(55, None)
+>>> line_items = invoice.split('\n')[2:]
+>>> for item in line_items:
+... print(item[UNIT_PRICE], item[DESCRIPTION])
+...
+$17.50 Pimoroni PiBrella
+$4.95 6mm Tactile Switch x20
+$28.00 Panavise Jr. - PV-201
+$34.95 PiTFT Mini Kit 320x240
+```
+
+
+
+##### 列表生成式
+
+
+```python
+# 生成整数的平方数组
+a= [n*n for n in range(1,11)]
+print(a)
+```
+
+    [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
+
+
+
+```python
+# 字符串整理，可以使用函数
+d = {'x': 'A', 'y': 'B', 'z': 'C' }
+[k + '=' + v for k, v in d.items()]
+```
+
+
+
+
+    ['x=A', 'y=B', 'z=C']
+
+
+
+
+```python
+# 有判断功能
+
+#此处不能使用else
+a = [x for x in range(1, 11) if x % 2 == 0] 
+#此处可以使用else
+b = [x if x % 2 == 0 else -x for x in range(1, 11)]
+
+print(a,b)
+```
+
+    [2, 4, 6, 8, 10] [-1, 2, -3, 4, -5, 6, -7, 8, -9, 10]
+
+
 
 ##### 初始化
 
@@ -2621,7 +2761,7 @@ ord('a')
 
 1. dict.fromkeys，默认值为none
 2. dict(二维列表)
-3. 通过字典推导式创建
+3. 通过**字典推导式**创建
 
 
 ```python
@@ -2649,7 +2789,7 @@ dict([['1',2],['3',4]])
 
     {'1': 2, '3': 4}
 
-
+**字典推导式**：
 
 
 ```python
@@ -2744,6 +2884,44 @@ sorted(prices,key=lambda x:x[1])
 
 
     ['AAPL', 'IBM', 'FB', 'ACME', 'HPQ']
+
+##### 默认方法setdefault
+
+**d.setdefault(k, [default]) ——可用于需要查找键+修改值的场景**
+
+若字典里有键k，则直接返回k 所对应的值；若无，则让d[k] = default，然后返回default。
+
+```python
+my_dict.setdefault(key, []).append(new_value)
+```
+
+跟这样写：
+
+```py
+if key not in my_dict:
+    my_dict[key] = []
+    my_dict[key].append(new_value)
+```
+
+二者的效果是一样的，只不过后者至少要进行两次键查询——如果键不存在的话。
+
+##### 以UserDict 为基类自定义映射类型
+
+```python
+import collections
+class StrKeyDict(collections.UserDict): 
+    def __missing__(self, key): 
+        #  __missing__定义了键非字符串的处理方式
+        if isinstance(key, str):
+            raise KeyError(key)
+        return self[str(key)]
+    def __contains__(self, key):
+        # 更简洁，不需要__missing__中的复杂处理
+        return str(key) in self.data 
+    def __setitem__(self, key, item):
+        self.data[str(key)] = item 
+
+```
 
 
 
@@ -2938,12 +3116,36 @@ collections.Counter(s)
 
 ### 数据结构
 
-#### collections.deque : 双端队列
+#### collections.namedtuple：具名元组
+
+可以用来构建一个带字段名的元组和一个有名字的类
+
+```py
+>>> from collections import namedtuple
+>>> City = namedtuple('City', 'name country population coordinates') 
+>>> tokyo = City('Tokyo', 'JP', 36.933, (35.689722, 139.691667)) 
+>>> tokyo
+City(name='Tokyo', country='JP', population=36.933, coordinates=(35.689722,
+139.691667))
+>>> tokyo.population 
+36.933
+>>> tokyo.coordinates
+(35.689722, 139.691667)
+>>> tokyo[1]
+'JP'
+>>> City._fields
+('name', 'country', 'population', 'coordinates')
+>>> delhi._asdict()
+OrderedDict([('name', 'Delhi NCR'), ('country', 'IN'), ('population',
+21.935), ('coordinates', LatLong(lat=28.613889, long=77.208889))])
+```
+
+
+
+#### collections.deque：双端队列
 
 deque是双端队列（double-ended queue）的缩写，由于两端都能编辑，deque既可以用来实现栈（stack）也可以用来实现队列（queue）。相比于list实现的队列，deque实现拥有更低的时间和空间复杂度。list实现在出队（pop）和插入（insert）时的空间复杂度大约为O(n)，deque在出队（pop）和入队（append）时的时间复杂度是O(1)。
-![image.png](attachment:image.png)
-
-+ 迭代操作或者其他操作的时候，可用于保留最后有限几个元素
+迭代操作或者其他操作的时候，可用于保留最后有限几个元素
 
 
 ```python
@@ -3087,4 +3289,303 @@ Item('foo')
 >>> q.pop()
 Item('grok')
 >>>
+```
+
+
+
+### 工具库
+
+#### Redis
+
+在Python中使用Redis是一个相对简单的过程，主要通过安装Redis服务器和使用Python的Redis客户端库来实现。以下是使用Redis的一般步骤：
+
+1. **安装Redis服务器**：
+   
+   - 首先，你需要在你的机器上安装Redis服务器。你可以从Redis官网下载并安装它，或者使用包管理器安装（例如，在Ubuntu上使用`sudo apt-get install redis-server`）。
+   
+2. **安装Python的Redis客户端库**：
+   
+   - 你可以使用pip来安装Redis的Python客户端库，最常用的是`redis-py`。通过运行`pip install redis`来安装。
+   
+3. **连接到Redis服务器**：
+   
+   - 使用`redis-py`库，你可以创建一个连接到Redis服务器的实例。
+   
+   ```python
+   import redis
+   
+   # 创建连接对象
+   r = redis.Redis(host='localhost', port=6379, db=0)
+   ```
+   
+4. **基本操作**：
+   - 一旦连接到Redis，你可以执行各种基本操作，如设置键值对、获取值、删除键等。
+
+   ```python
+   # 设置键值对
+   r.set('my_key', 'my_value')
+   
+   # 获取键的值
+   value = r.get('my_key')
+   print(value)  # 输出: b'my_value'
+   
+   # 删除键
+   r.delete('my_key')
+   ```
+
+5. **使用哈希**：
+   - Redis支持哈希类型，可以存储键值对的集合。
+
+   ```python
+   # 设置哈希
+   r.hset('my_hash', 'field1', 'value1')
+   r.hset('my_hash', 'field2', 'value2')
+   
+   # 获取哈希中的字段值
+   value = r.hget('my_hash', 'field1')
+   print(value)  # 输出: b'value1'
+   
+   # 获取哈希中的所有字段和值
+   all_values = r.hgetall('my_hash')
+   print(all_values)  # 输出: {'field1': b'value1', 'field2': b'value2'}
+   ```
+
+6. **使用列表**：
+   - Redis的列表是简单的字符串列表，按照插入顺序排序。
+
+   ```python
+   # 将元素添加到列表
+   r.lpush('my_list', 'item1')
+   r.lpush('my_list', 'item2')
+   
+   # 获取列表中的元素
+   value = r.lindex('my_list', 0)  # 获取列表的第一个元素
+   print(value)  # 输出: b'item2'
+   
+   # 获取列表的切片
+   values = r.lrange('my_list', 0, -1)  # 获取列表的所有元素
+   print(values)  # 输出: [b'item2', b'item1']
+   ```
+
+7. **使用集合**：
+   - Redis的集合是无序的，并且集合中的元素是唯一的。
+
+   ```python
+   # 将元素添加到集合
+   r.sadd('my_set', 'item1')
+   r.sadd('my_set', 'item2')
+   
+   # 获取集合中的元素
+   values = r.smembers('my_set')
+   print(values)  # 输出可能是: {'item1', 'item2'}
+   ```
+
+8. **使用有序集合**：
+   - 有序集合类似于集合，但它可以为每个元素关联一个分数，Redis会根据这个分数为元素进行排序。
+
+   ```python
+   # 添加元素到有序集合并设置分数
+   r.zadd('my_zset', {'item1': 1, 'item2': 2})
+   
+   # 获取有序集合中的元素
+   values = r.zrange('my_zset', 0, -1, withscores=True)
+   print(values)  # 输出可能是: [(b'item1', 1), (b'item2', 2)]
+   ```
+
+9. **发布/订阅**：
+   - Redis支持发布订阅模式，允许你发送消息到频道，并让订阅这些频道的客户端接收消息。
+
+   ```python
+   # 发布消息
+   r.publish('my_channel', 'Hello world!')
+   
+   # 订阅频道
+   pubsub = r.pubsub()
+   pubsub.subscribe(**{'my_channel': lambda message: print(message['data'])})
+   pubsub.run_in_thread(sleep_time=0.001)
+   ```
+
+10. **连接池**：
+    
+    - 为了提高性能，可以使用连接池来管理Redis连接。
+    
+    ```python
+    from redis import ConnectionPool
+    
+    pool = ConnectionPool(host='localhost', port=6379, db=0)
+    r = redis.Redis(connection_pool=pool)
+    ```
+    
+11. **使用SSL连接**：
+    - 如果你的Redis服务器配置了SSL，你可以使用SSL连接。
+
+    ```python
+    r = redis.Redis(host='localhost', port=6379, ssl=True, ssl_ca_certs='ca.crt', ssl_cert_reqs='required')
+    ```
+
+12. **异常处理**：
+    - 使用Redis时，你可能会遇到各种异常，如连接错误、数据错误等。使用try-except块来处理这些异常。
+
+    ```python
+    try:
+        r.set('my_key', 'my_value')
+    except redis.RedisError as e:
+        print(f'An error occurred: {e}')
+    ```
+
+这些是使用Python和Redis进行基本操作的一些示例。`redis-py`库提供了丰富的API来支持Redis的所有功能，包括管道、事务、Lua脚本执行等高级特性。你可以查阅[`redis-py`官方文档](https://redis-py.readthedocs.io/en/latest/)来获取更详细的信息和高级用法。
+
+#### RabbitMQ
+
+Python 中使用 RabbitMQ 的一个简单例子可以包括以下几个步骤：
+
+1. **安装 RabbitMQ 服务器**：首先，你需要在你的机器上安装 RabbitMQ 服务器。可以从 RabbitMQ 官网下载并安装。
+
+2. **安装 Python 客户端库**：使用 pip 安装 `pika`，这是 Python 的 RabbitMQ 客户端库。
+
+   ```bash
+   pip install pika
+   ```
+
+3. **创建 RabbitMQ 连接**：在 Python 脚本中，首先需要创建一个到 RabbitMQ 服务器的连接。
+
+   ```python
+   import pika
+   
+   connection = pika.BlockingConnection(
+       pika.ConnectionParameters(host = MQ_CONFIG.get('host'),port = MQ_CONFIG.get('port'),
+       virtual_host = MQ_CONFIG.get('vhost'),credentials = credentials, heartbeat=int(1 * 60 * 60)))
+   channel = connection.channel()
+   # basic_qos 方法的 prefetch_count 参数指定了消费者在处理完当前消息之前可以接收的消息数量。
+   # 如果设置为 1，这意味着消费者一次只能接收一个消息，并且必须在接收下一个消息之前确认当前消息。
+   # 与MQ服务端无关
+   channel.basic_qos(prefetch_count=1)
+   ```
+
+4. **声明队列**：声明一个队列，消息将发送到这个队列。
+
+   ```python
+   channel.queue_declare(queue='hello')
+   ```
+
+5. **发送消息**：创建一个发送者，将消息发送到队列。
+
+   ```python
+   channel.basic_publish(exchange='',
+                         routing_key='hello',
+                         body='Hello World!')
+   print(" [x] Sent 'Hello World!'")
+   ```
+
+6. **接收消息**：创建一个接收者，监听队列并接收消息。
+
+   ```python
+   def callback(ch, method, properties, body):
+       print(" [x] Received %r" % body)
+
+   channel.basic_consume(queue='hello',
+                          on_message_callback=callback,
+                          auto_ack=True)
+
+   print(' [*] Waiting for messages. To exit press CTRL+C')
+   channel.start_consuming()
+   ```
+
+7. **关闭连接**：在消息接收完毕后，关闭连接。
+
+   ```python
+   connection.close()
+   ```
+
+
+
+### 设计模式
+
+模板方法模式（Template Method Pattern）和建造者模式（Builder Pattern）是两种不同的设计模式，它们在软件设计中有不同的应用场景和目的。
+
+**模板方法模式**
+
+1. **定义**：模板方法模式是一种行为设计模式，它在超类中定义了一个算法的框架，同时允许子类在不改变算法结构的情况下重新定义算法的某些步骤。
+2. **目的**：目的是让子类可以重新定义算法的某些步骤，而不必改变算法的整体结构。
+3. **结构**：通常包含一个模板方法和一个或多个基本方法。模板方法是抽象的，而基本方法是具体实现或者留给子类实现。
+4. **使用场景**：当你有一系列相似的行为，它们有固定的算法结构，但某些步骤可以在子类中有不同的实现时。
+
+**建造者模式**
+
+1. **定义**：建造者模式是一种创建型设计模式，用于创建一个复杂的对象，同时允许用户只通过指定复杂对象的类型和内容就能构建它们，隐藏了内部的构建细节。
+2. **目的**：目的是将一个复杂对象的构建与其表示分离，使得同样的构建过程可以创建不同的表示。
+3. **结构**：通常包含一个建造者接口、具体建造者实现、一个指挥者以及一个产品类。
+4. **使用场景**：当你需要创建一个包含多个组成部分的复杂对象，同时希望将对象的构建和表示分离，或者当构建过程需要在不同的场景下有不同的变体时。
+
+**主要区别**
+
+- **目的不同**：模板方法模式关注于算法的结构和某些步骤的可定制性，而建造者模式关注于对象的构建过程和复杂对象的表示。
+- **应用场景不同**：模板方法模式适用于有固定算法结构但需要在某些步骤上提供灵活性的情况；建造者模式适用于创建具有复杂内部表示的对象，且构建过程可能因场景而异。
+- **结构不同**：模板方法模式通常包含模板方法和基本方法，而建造者模式包含建造者接口、具体建造者、指挥者和产品类。
+- **灵活性**：模板方法模式的灵活性在于算法的某些步骤可以被重新定义，而建造者模式的灵活性在于可以构建出不同类型的复杂对象。
+
+两种模式在实际应用中可以根据具体的需求和场景来选择使用。
+
+```python
+from abc import ABC, abstractmethod
+
+# 模板方法模式：游戏单位创建流程
+class UnitFactory(ABC):
+    @abstractmethod
+    def build_structure(self):
+        pass
+
+    @abstractmethod
+    def add_capabilities(self):
+        pass
+
+    @abstractmethod
+    def finalize_unit(self):
+        pass
+
+    def create_unit(self):
+        self.build_structure()
+        self.add_capabilities()
+        self.finalize_unit()
+        return self.unit
+
+# 建造者模式：实现不同类型的单位建造者
+class WarriorUnitBuilder(UnitFactory):
+    def __init__(self):
+        self.unit = Warrior()
+
+    def build_structure(self):
+        print("Building structure for warrior unit.")
+        self.unit.set_armor()
+
+    def add_capabilities(self):
+        print("Adding capabilities to warrior unit.")
+        self.unit.set_weapon()
+
+    def finalize_unit(self):
+        print("Finalizing warrior unit.")
+        self.unit.activate()
+
+class MageUnitBuilder(UnitFactory):
+    def __init__(self):
+        self.unit = Mage()
+
+    def build_structure(self):
+        print("Building structure for mage unit.")
+        self.unit.set_robes()
+
+    def add_capabilities(self):
+        print("Adding capabilities to mage unit.")
+        self.unit.learn_spells()
+
+    def finalize_unit(self):
+        print("Finalizing mage unit.")
+        self.unit.meditate()
+
+# 使用模板方法与建造者模式
+warrior_builder = WarriorUnitBuilder()
+warrior = warrior_builder.create_unit()
+
+mage_builder = MageUnitBuilder()
+mage = mage_builder.create_unit()
 ```
